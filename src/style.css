@@ -88,3 +88,7 @@ main{
   color: var(--liClr);
   cursor: pointer;
 }
+
+#gameInfo {
+  display: none; /* Hide initially */
+}
