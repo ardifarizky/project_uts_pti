@@ -8,12 +8,6 @@ const sizes = {
 
 const speedDown = 300
 
-const gameStartDiv = document.querySelector("#gameStartDiv")
-const gameStartBtn = document.querySelector("#gameStartBtn")
-const gameEndDiv = document.querySelector("#gameEndDiv")
-const gameWinLoseSpan = document.querySelector("#gameWinLoseSpan")
-const gameEndScoreSpan = document.querySelector("#gameEndScoreSpan")
-
 class GameScene extends Phaser.Scene {
   constructor(){
     super("scene-game");
@@ -33,8 +27,6 @@ class GameScene extends Phaser.Scene {
 
   preload(){
     this.load.image("bg2","/assets/bg2.png") //background
-    this.load.image("basket", "/assets/basket.png")
-    this.load.image("apple","/assets/apple.png")
     this.load.audio("coin", "/assets/coin.mp3")
     this.load.audio("bgMusic", "/assets/bgMusic.mp3")
     //load spritesheet karakter
@@ -90,8 +82,8 @@ class GameScene extends Phaser.Scene {
     this.player.setImmovable(true)
     this.player.body.allowGravity = false
     this.player.setCollideWorldBounds(true)
-    this.player.setSize(this.player.width-this.player.width/4, this.player.height/6)
-    .setOffset(this.player.width/10, this.player.height - this.player.height/10)
+    this.player.setSize(this.player.width-this.player.width/4, this.player.height/2) //player collider
+    .setOffset(this.player.width/10, this.player.height - this.player.height/2)
 
     // ==================== CAMERA ====================
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -100,13 +92,8 @@ class GameScene extends Phaser.Scene {
 
 
     // ==================== TARGET ====================
-    this.target =  this.physics.add
-      .image(0,sizes.height-100, "apple")
-      .setOrigin(0,0)
-    this.target.setMaxVelocity(0, speedDown)
 
     // ==================== OVERLAP ====================
-    this.physics.add.overlap(this.target,this.player,this.targetHit, null, this)
 
     // ==================== KEYBOARD INPUT ====================
 
@@ -119,15 +106,6 @@ class GameScene extends Phaser.Scene {
     });    
 
     // ==================== TEXT SCORE & TIME ====================
-    
-    this.textScore = this.add.text(sizes.width-120,10,"Score: 0", {
-      font: "25px Arial",
-      fill: "#000000",
-    });
-    this.textTime = this.add.text(10,10,"Remaining Time: 00", {
-      font: "25px Arial",
-      fill: "#000000",
-    });
 
     this.timeEvent = this.time.delayedCall(30000,this.gameOver,[], this)
 
@@ -143,13 +121,6 @@ class GameScene extends Phaser.Scene {
   }
 
   update(){
-    this.remainingTime = this.timeEvent.getRemainingSeconds()
-    this.textTime.setText(`Remaining Time: ${Math.round(this.remainingTime).toString()}`)
-
-    if(this.target.y >= sizes.height){
-      this.target.setY(0)
-      this.target.setX(this.getRandomX())
-    }
 
     // ==================== PLAYER MOVEMENT ====================
 
@@ -159,7 +130,7 @@ class GameScene extends Phaser.Scene {
     if(left.isDown || A.isDown){
       this.player.setVelocityX(-this.playerSpeed);
       this.player.setFlipX(true);
-      this.player.anims.play('walk-left', true);
+      this.player.anims.play('walk-right', true);
     } else if(right.isDown || D.isDown){
       this.player.setVelocityX(this.playerSpeed);
       this.player.setFlipX(false);
@@ -181,31 +152,6 @@ class GameScene extends Phaser.Scene {
     }
 }
 
-  getRandomX(){
-    return Math.floor(Math.random()*480)
-  }
-
-  targetHit(){
-    this.coinMusic.play()
-    this.emitter.start()
-    this.target.setY(0)
-    this.target.setX(this.getRandomX())
-    this.points++
-    this.textScore.setText(`Score: ${this.points}`)
-  }
-
-  gameOver(){
-    this.sys.game.destroy(true)
-
-    if(this.points>=10){
-      gameEndScoreSpan.textContent=this.points
-      gameWinLoseSpan.textContent="Win<3"
-    }else{
-      gameEndScoreSpan.textContent=this.points
-      gameWinLoseSpan.textContent="Lose!"
-    }
-    gameEndDiv.style.display="flex"
-  }
 }
 
 const config = {
