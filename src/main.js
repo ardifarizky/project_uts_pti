@@ -23,6 +23,11 @@ class GameScene extends Phaser.Scene {
     this.coinMusic
     this.bgMusic
     this.emitter
+    this.hunger = 50;
+    this.energy = 50;
+    this.hygiene = 50;
+    this.happiness = 50;
+    this.money = 100; // Uang dimulai dari 100
 
     // ====== WAKTU GAME ======
     let now = new Date();
@@ -66,10 +71,38 @@ class GameScene extends Phaser.Scene {
 
     this.updateGameTime();
 
+    // TEXT MONEY
+    this.moneyText = this.add.text(370, 10, `Money: $${this.money}`, { font: "20px Arial", fill: "#ffffff" });
+
+    // GRAPHICS FOR PROGRESS BARS
+    this.progressBars = {
+      hunger: this.add.graphics(),
+      energy: this.add.graphics(),
+      hygiene: this.add.graphics(),
+      happiness: this.add.graphics(),
+    };
+
+    // LABELS
+    this.add.text(310, 48, "Hunger:", { font: "14px Arial", fill: "#ffffff" });
+    this.add.text(310, 68, "Energy:", { font: "14px Arial", fill: "#ffffff" });
+    this.add.text(310, 88, "Hygiene:", { font: "14px Arial", fill: "#ffffff" });
+    this.add.text(310, 108, "Happiness:", { font: "14px Arial", fill: "#ffffff" });
+
+    // Gambar pertama kali
+    this.drawProgressBars();
+
     // Running update game time
     this.time.addEvent({
       delay: 100, //1 detik real-time = 10 menit di game
       callback: this.updateGameTime,
+      callbackScope: this,
+      loop: true
+    });
+
+    // Setiap 5 detik, kurangi progress bar
+    this.time.addEvent({
+      delay: 5000, // 5 detik real-time
+      callback: this.updateStats,
       callbackScope: this,
       loop: true
     });
@@ -176,6 +209,39 @@ class GameScene extends Phaser.Scene {
     // Update teks di layar
     this.greetingLabel.setText(`${this.greetingText}`);
     this.timeLabel.setText(`${this.currentWeekDay} | Day ${this.gameDay} | ${timeText}`);
+  }  
+
+  updateStats() {
+    this.hunger = Math.max(0, this.hunger - 2);
+    this.energy = Math.max(0, this.energy - 1);
+    this.hygiene = Math.max(0, this.hygiene - 3);
+    this.happiness = Math.max(0, this.happiness - 1);
+  
+    // Perbarui tampilan progress bar
+    this.drawProgressBars();
+  
+    // Update tampilan uang
+    this.moneyText.setText(`Money: $${this.money}`);
+  }
+  
+  drawProgressBars() {
+    // Bersihkan progress bar sebelumnya
+    this.progressBars.hunger.clear();
+    this.progressBars.energy.clear();
+    this.progressBars.hygiene.clear();
+    this.progressBars.happiness.clear();
+  
+    // Warna progress bar (merah, kuning, hijau, biru)
+    const colors = [0xff0000, 0xffff00, 0x00ff00, 0x0000ff];
+  
+    // Gambar setiap progress bar
+    const stats = [this.hunger, this.energy, this.hygiene, this.happiness];
+    const bars = ["hunger", "energy", "hygiene", "happiness"];
+    
+    for (let i = 0; i < bars.length; i++) {
+      this.progressBars[bars[i]].fillStyle(colors[i], 1);
+      this.progressBars[bars[i]].fillRect(400, 50 + i * 20, stats[i], 10); // X, Y, width, height
+    }
   }  
 
   update(){
