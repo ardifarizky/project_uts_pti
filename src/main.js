@@ -23,6 +23,15 @@ class GameScene extends Phaser.Scene {
     this.coinMusic
     this.bgMusic
     this.emitter
+
+    // ====== WAKTU GAME ======
+    let now = new Date();
+    this.gameTimeMinutes = now.getHours() * 60 + now.getMinutes(); // Konversi jam ke menit
+    this.gameDay = 1;
+    this.weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    this.currentWeekDay = this.weekDays[now.getDay()]; // Ambil hari sesuai real-time
+    this.greetingText = "";
+
   }
 
   preload(){
@@ -51,6 +60,20 @@ class GameScene extends Phaser.Scene {
     //background
     this.add.image(0,0,"bg2").setOrigin(0,0).setDisplaySize(sizes.width,sizes.height)
 
+    // ==================== TEXT GREETING & TIME ====================
+    this.greetingLabel = this.add.text(10, 10, "", { font: "20px Arial", fill: "#ffffff" });
+    this.timeLabel = this.add.text(10, 40, "", { font: "20px Arial", fill: "#ffffff" });
+
+    this.updateGameTime();
+
+    // Running update game time
+    this.time.addEvent({
+      delay: 100, //1 detik real-time = 10 menit di game
+      callback: this.updateGameTime,
+      callbackScope: this,
+      loop: true
+    });
+    
     // ==================== PLAYER ====================
 
     //animasi jalan player
@@ -119,6 +142,41 @@ class GameScene extends Phaser.Scene {
     this.emitter
     .startFollow(this.player,this.player.width/2,this.player.height/2,true)
   }
+
+  updateGameTime() {
+    console.log("Game time updated!"); // Debugging untuk memastikan ini hanya berjalan tiap 5 detik.
+    this.gameTimeMinutes++;
+  
+    // Jika sudah mencapai 24 jam (1440 menit), pindah ke hari berikutnya
+    if (this.gameTimeMinutes >= 1440) {
+      this.gameTimeMinutes = 0; // Reset ke 00:00
+      this.gameDay++; // Tambah hari
+      let nextDayIndex = (this.weekDays.indexOf(this.currentWeekDay) + 1) % 7;
+      this.currentWeekDay = this.weekDays[nextDayIndex]; // Update hari
+    }
+  
+    // Hitung jam dan menit dalam game
+    let hours = Math.floor(this.gameTimeMinutes / 60);
+    let minutes = this.gameTimeMinutes % 60;
+  
+    // Format waktu (contoh: "08:00")
+    let timeText = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  
+    // Perbarui greeting berdasarkan jam
+    if (hours >= 5 && hours < 12) {
+      this.greetingText = "Good Morning";
+    } else if (hours >= 12 && hours < 18) {
+      this.greetingText = "Good Afternoon";
+    } else if (hours >= 18 && hours < 22) {
+      this.greetingText = "Good Evening";
+    } else {
+      this.greetingText = "Good Night";
+    }
+  
+    // Update teks di layar
+    this.greetingLabel.setText(`${this.greetingText}`);
+    this.timeLabel.setText(`${this.currentWeekDay} | Day ${this.gameDay} | ${timeText}`);
+  }  
 
   update(){
 
