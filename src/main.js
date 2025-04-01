@@ -31,7 +31,7 @@ class GameScene extends Phaser.Scene {
 
     // ====== WAKTU GAME ======
     let now = new Date();
-    this.gameTimeMinutes = now.getHours() * 60 + now.getMinutes(); // Konversi jam ke menit
+    this.gameTimeMinutes = 480; // Konversi jam ke menit
     this.gameDay = 1;
     this.weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     this.currentWeekDay = this.weekDays[now.getDay()]; // Ambil hari sesuai real-time
