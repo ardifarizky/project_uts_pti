@@ -296,6 +296,14 @@ const config = {
 const game = new Phaser.Game(config)
 
 gameStartBtn.addEventListener("click", ()=>{
+  const playerName = document.getElementById('playerName').value.trim();
+
+  if (!playerName) {
+    alert("Please enter your name!");
+  } else {
+    console.log(`Player's name: ${playerName}`);
+
   gameStartDiv.style.display="none"
   game.scene.resume("scene-game")
-})
+  }
+});

@@ -12,11 +12,30 @@
     </header>
     <main>
       <canvas id="gameCanvas"></canvas>
+
       <div id="gameStartDiv" class="gameUI">
         <h1>Ucup Menjelajah Nusantara</h1>
+
+        <!-- Form Masukkan Nama -->
+        <div id="nameInputDiv">
+          <label for="playerName">Enter your name:</label>
+          <input type="text" id="playerName" placeholder="Your name" required/>
+        </div>
+        
+        <!-- Seleksi Karakter -->
+        <div id="characterSelection">
+          <h3>Select a Character:</h3>
+          <select id="characterSelect">
+            <option value="ucup">Ucup</option>
+            <option value="budi">Budi</option>
+            <option value="doni">Doni</option>
+          </select>
+
+        <!-- Tombol Game Start -->
         <p>Click the start button to begin</p>
-        <button id="gameStartBtn"><p>start</p></button>
+        <button id="gameStartBtn"><p>Start</p></button>
       </div>
+
       <div id="gameEndDiv" class="gameUI">
         <P>Game Over</P>
         <h1>You <span id="gameWinLoseSpan"></span></h1>
@@ -24,9 +43,11 @@
         <p>Refresh the Page to Play Again</p>
       </div>
     </main>
+
     <footer>
       <p>Created By Kelompok 5 | 2025</p>
     </footer>
+    
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
