@@ -98,3 +98,17 @@ main{
 #gameInfo {
   display: none; /* Hide initially */
 }
+
+#restartGameBtn {
+  margin-top: 10px;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+#restartGameBtn:hover {
+  background-color: #0056b3;
+}
