@@ -11,6 +11,10 @@ const GAME_SIZE = {
   width: 500,
   height: 500
 };
+const WORLD_SIZE = {
+  width: 1600,
+  height: 1600
+};
 const SPEED_DOWN = 300;
 const PLAYER_SPEED = SPEED_DOWN + 50;
 
@@ -106,11 +110,19 @@ class GameScene extends Phaser.Scene {
     this.load.audio("coin", "/assets/coin.mp3");
     this.load.audio("bgMusic", "/assets/bgMusic.mp3");
     this.load.spritesheet('player', '/assets/Player/Player.png', {frameWidth: 32, frameHeight: 32});
+    
+    // Set world bounds
+    this.physics.world.setBounds(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
   }
 
   create() {
     // Initially pause game until name is entered
     this.scene.pause("scene-game");
+    
+    // Create UI container first (but add elements later)
+    this.uiContainer = this.add.container(0, 0);
+    this.uiContainer.setScrollFactor(0);
+    this.uiContainer.setDepth(100);
     
     // Set up event listeners
     this.setupEventListeners();
@@ -118,23 +130,32 @@ class GameScene extends Phaser.Scene {
     // Setup audio
     this.setupAudio();
     
-    // Create environment
+    // Create environment (without decorations yet)
     this.createEnvironment();
-    
-    // Create UI elements
-    this.createUI();
     
     // Create player and animations
     this.createPlayer();
+    
+    // Add world decorations (after player exists)
+    this.createWorldDecorations();
     
     // Create house
     this.createHouse();
 
     // Add collision between player and house
-    this.physics.add.collider(this.player, this.house);
+    this.physics.add.collider(
+      this.player, 
+      this.house, 
+      null, 
+      () => true, 
+      this
+    );
 
-    // Setup camera
+    // Setup camera and minimap
     this.setupCamera();
+    
+    // Now add UI elements to the container we created earlier
+    this.populateUI();
     
     // Setup input controls
     this.setupControls();
@@ -144,19 +165,17 @@ class GameScene extends Phaser.Scene {
     
     // Create particle emitter
     this.createEmitter();
-
-
   }
 
   setupEventListeners() {
     document.getElementById('playerName').addEventListener('focus', () => {
       isNameInputActive = true;
-      console.log("Input nama aktif");
+      console.log("Input name active");
     });
 
     document.getElementById('playerName').addEventListener('blur', () => {
       isNameInputActive = false;
-      console.log("Input nama tidak aktif");
+      console.log("Input name inactive");
     });
   }
   
@@ -170,8 +189,46 @@ class GameScene extends Phaser.Scene {
   }
   
   createEnvironment() {
-    // Add background
-    this.add.image(0, 0, "bg2").setOrigin(0, 0).setDisplaySize(GAME_SIZE.width, GAME_SIZE.height);
+    // Create a much larger world
+    this.physics.world.setBounds(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
+    
+    // Add background - repeat it to fill the world
+    let bgTile = this.add.tileSprite(0, 0, WORLD_SIZE.width, WORLD_SIZE.height, "bg2");
+    bgTile.setOrigin(0, 0);
+    bgTile.setDepth(0);
+  }
+  
+  createWorldDecorations() {
+    // Store additional houses for collision
+    this.additionalHouses = [];
+    
+    // Add a few more houses in different locations
+    let house2 = this.physics.add.sprite(800, 800, "house");
+    house2.setScale(2);
+    house2.setImmovable(true);
+    house2.body.allowGravity = false;
+    this.additionalHouses.push(house2);
+    
+    let house3 = this.physics.add.sprite(400, 1200, "house");
+    house3.setScale(2);
+    house3.setImmovable(true);
+    house3.body.allowGravity = false;
+    this.additionalHouses.push(house3);
+    
+    // Configure hitboxes similar to main house
+    this.additionalHouses.forEach(house => {
+      house.body.setSize(
+        house.width * 0.7, 
+        house.height * 0.4
+      );
+      house.body.setOffset(
+        house.width * 0.15,
+        house.height * 0.4
+      );
+      
+      // Add collision with player
+      this.physics.add.collider(this.player, house);
+    });
   }
   
   createHouse() {
@@ -183,24 +240,28 @@ class GameScene extends Phaser.Scene {
     this.house.setImmovable(true);
     this.house.body.allowGravity = false;
     
-    // Adjust collision box
-    this.house.setSize(
-      this.house.width * 0.8, 
-      this.house.height * 0.5
-    ).setOffset(
-      this.house.width * 0.1,
-      this.house.height * 0.5
+    // Create a smaller but still effective collision box
+    this.house.body.setSize(
+      this.house.width * 0.7, 
+      this.house.height * 0.4
+    );
+    this.house.body.setOffset(
+      this.house.width * 0.15,
+      this.house.height * 0.4
     );
   }
 
-  createUI() {
+  populateUI() {
     // Create greeting and time labels
     this.greetingLabel = this.add.text(10, 10, "", { font: "20px Arial", fill: "#ffffff" });
     this.timeLabel = this.add.text(10, 40, "", { font: "20px Arial", fill: "#ffffff" });
-    this.updateGameTime();
-    
-    // Create money text
     this.moneyText = this.add.text(370, 10, `Money: $${this.money}`, { font: "20px Arial", fill: "#ffffff" });
+    
+    // Add labels to UI container
+    this.uiContainer.add([this.greetingLabel, this.timeLabel, this.moneyText]);
+    
+    // Update game time
+    this.updateGameTime();
     
     // Create progress bars and labels
     this.createProgressBars();
@@ -215,11 +276,20 @@ class GameScene extends Phaser.Scene {
       happiness: this.add.graphics(),
     };
     
+    // Set high depth for all progress bars
+    Object.values(this.progressBars).forEach(bar => {
+      bar.setDepth(100);
+    });
+    
     // Labels
-    this.add.text(310, 48, "Hunger:", { font: "14px Arial", fill: "#ffffff" });
-    this.add.text(310, 68, "Energy:", { font: "14px Arial", fill: "#ffffff" });
-    this.add.text(310, 88, "Hygiene:", { font: "14px Arial", fill: "#ffffff" });
-    this.add.text(310, 108, "Happiness:", { font: "14px Arial", fill: "#ffffff" });
+    const hungerLabel = this.add.text(310, 48, "Hunger:", { font: "14px Arial", fill: "#ffffff" });
+    const energyLabel = this.add.text(310, 68, "Energy:", { font: "14px Arial", fill: "#ffffff" });
+    const hygieneLabel = this.add.text(310, 88, "Hygiene:", { font: "14px Arial", fill: "#ffffff" });
+    const happinessLabel = this.add.text(310, 108, "Happiness:", { font: "14px Arial", fill: "#ffffff" });
+    
+    // Add to UI container so they stay fixed to the camera
+    this.uiContainer.add([hungerLabel, energyLabel, hygieneLabel, happinessLabel]);
+    this.uiContainer.add(Object.values(this.progressBars));
     
     // Draw initial progress bars
     this.drawProgressBars();
@@ -232,18 +302,19 @@ class GameScene extends Phaser.Scene {
     // Create player sprite
     this.player = this.physics.add.sprite(100, 100, 'player');
     this.player.setScale(2);
-    this.player.setImmovable(true);
+    this.player.setImmovable(false);
     this.player.body.allowGravity = false;
     this.player.setCollideWorldBounds(true);
-    this.player.setDepth(3)
+    this.player.setDepth(3);
     
     // Adjust player collision box
-    this.player.setSize(
-      this.player.width - this.player.width / 4, 
-      this.player.height / 2
-    ).setOffset(
-      this.player.width / 10, 
-      this.player.height - this.player.height / 2
+    this.player.body.setSize(
+      this.player.width * 0.6, 
+      this.player.height * 0.5
+    );
+    this.player.body.setOffset(
+      this.player.width * 0.2, 
+      this.player.height * 0.5
     );
   }
   
@@ -271,9 +342,44 @@ class GameScene extends Phaser.Scene {
   }
   
   setupCamera() {
+    // Main camera - follows player
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.cameras.main.setBounds(0, 0, 500, 500);
+    this.cameras.main.setBounds(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
     this.cameras.main.setZoom(1);
+    
+    // Add minimap camera in the corner
+    this.createMinimap();
+  }
+  
+  createMinimap() {
+    // Create a minimap in the bottom-right corner
+    const minimapWidth = 150;
+    const minimapHeight = 150;
+    const minimapX = GAME_SIZE.width - minimapWidth - 10;
+    const minimapY = GAME_SIZE.height - minimapHeight - 10;
+    
+    // Create minimap camera
+    this.minimapCamera = this.cameras.add(
+      minimapX, minimapY, minimapWidth, minimapHeight
+    );
+    
+    // Configure minimap
+    this.minimapCamera.setBounds(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
+    this.minimapCamera.setZoom(0.1); // Zoom out to see more of the world
+    this.minimapCamera.setBackgroundColor('rgba(0, 0, 0, 0.5)');
+    this.minimapCamera.startFollow(this.player);
+    
+    // Ignore UI layer in minimap (only if it exists)
+    if (this.uiContainer) {
+      this.minimapCamera.ignore(this.uiContainer);
+    }
+    
+    // Create border around minimap
+    const border = this.add.graphics();
+    border.lineStyle(2, 0xffffff, 1);
+    border.strokeRect(minimapX, minimapY, minimapWidth, minimapHeight);
+    border.setScrollFactor(0);
+    border.setDepth(90); // Below UI but above other elements
   }
   
   setupControls() {
@@ -350,9 +456,11 @@ class GameScene extends Phaser.Scene {
       this.greetingText = `Good Night ${playerName}`;
     }
   
-    // Update text labels
-    this.greetingLabel.setText(this.greetingText);
-    this.timeLabel.setText(`${this.currentWeekDay} | Day ${this.gameDay} | ${timeText}`);
+    // Update text labels if they exist
+    if (this.greetingLabel && this.timeLabel) {
+      this.greetingLabel.setText(this.greetingText);
+      this.timeLabel.setText(`${this.currentWeekDay} | Day ${this.gameDay} | ${timeText}`);
+    }
   }  
 
   updateStats() {
@@ -362,9 +470,15 @@ class GameScene extends Phaser.Scene {
     this.hygiene = Math.max(0, this.hygiene - 3);
     this.happiness = Math.max(0, this.happiness - 1);
 
-    // Update UI
-    this.drawProgressBars();
-    this.moneyText.setText(`Money: $${this.money}`);
+    // Update UI if elements exist
+    if (this.moneyText) {
+      this.moneyText.setText(`Money: $${this.money}`);
+    }
+    
+    // Update progress bars if they exist
+    if (this.progressBars) {
+      this.drawProgressBars();
+    }
 
     // Check for game over condition
     if (this.hunger === 0 || this.energy === 0 || this.hygiene === 0 || this.happiness === 0) {
@@ -373,6 +487,9 @@ class GameScene extends Phaser.Scene {
   }
   
   drawProgressBars() {
+    // Safety check - make sure progress bars exist
+    if (!this.progressBars) return;
+    
     // Clear previous bars
     Object.values(this.progressBars).forEach(bar => bar.clear());
   
@@ -383,8 +500,10 @@ class GameScene extends Phaser.Scene {
     
     // Draw each bar
     for (let i = 0; i < bars.length; i++) {
-      this.progressBars[bars[i]].fillStyle(colors[i], 1);
-      this.progressBars[bars[i]].fillRect(400, 50 + i * 20, stats[i], 10);
+      if (this.progressBars[bars[i]]) {
+        this.progressBars[bars[i]].fillStyle(colors[i], 1);
+        this.progressBars[bars[i]].fillRect(400, 50 + i * 20, stats[i], 10);
+      }
     }
   }  
 
@@ -415,29 +534,48 @@ class GameScene extends Phaser.Scene {
     const { left, right, up, down } = this.cursor;
     const { left: A, right: D, up: W, down: S } = this.wasd;
 
+    // Reset velocity
+    this.player.setVelocity(0);
+
+    // Calculate movement speed
+    let speed = this.playerSpeed;
+    
+    // Handle diagonal movement (normalize speed)
+    const isDiagonal = 
+      (left.isDown || A.isDown || right.isDown || D.isDown) && 
+      (up.isDown || W.isDown || down.isDown || S.isDown);
+    
+    if (isDiagonal) {
+      speed = speed * 0.7071; // Approximately 1/sqrt(2)
+    }
+
     // Handle horizontal movement
     if (left.isDown || A.isDown) {
-      this.player.setVelocityX(-this.playerSpeed);
+      this.player.setVelocityX(-speed);
       this.player.setFlipX(true);
-      this.player.anims.play('walk-right', true);
+      if (!(up.isDown || W.isDown || down.isDown || S.isDown)) {
+        this.player.anims.play('walk-right', true);
+      }
     } else if (right.isDown || D.isDown) {
-      this.player.setVelocityX(this.playerSpeed);
+      this.player.setVelocityX(speed);
       this.player.setFlipX(false);
-      this.player.anims.play('walk-right', true);
-    } else {
-      this.player.setVelocityX(0);
-      this.player.anims.stop();
+      if (!(up.isDown || W.isDown || down.isDown || S.isDown)) {
+        this.player.anims.play('walk-right', true);
+      }
     }
 
     // Handle vertical movement
     if (up.isDown || W.isDown) {
-      this.player.setVelocityY(-this.playerSpeed);
+      this.player.setVelocityY(-speed);
       this.player.anims.play('walk-up', true);
     } else if (down.isDown || S.isDown) {
-      this.player.setVelocityY(this.playerSpeed);
+      this.player.setVelocityY(speed);
       this.player.anims.play('walk-down', true);
-    } else {
-      this.player.setVelocityY(0);
+    }
+    
+    // If no movement keys are pressed, stop animations
+    if (!(left.isDown || A.isDown || right.isDown || D.isDown || 
+          up.isDown || W.isDown || down.isDown || S.isDown)) {
       this.player.anims.stop();
     }
   }
@@ -453,7 +591,9 @@ const config = {
     default: "arcade",
     arcade: {
       gravity: { y: SPEED_DOWN },
-      debug: true
+      debug: true,
+      fps: 60,
+      tileBias: 32
     }
   },
   scene: [GameScene]
