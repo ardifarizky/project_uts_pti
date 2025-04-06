@@ -769,8 +769,11 @@ class HouseScene extends Phaser.Scene {
   
   createPlayer() {
     // Create player sprite - use saved position or default
+    // Move player spawn position away from the exit door
     this.player = this.physics.add.sprite(
-      lastHousePos.x, lastHousePos.y, 'player'
+      lastHousePos.x, 
+      Math.min(lastHousePos.y, 350), // Ensure player doesn't spawn below y=350 to stay away from exit
+      'player'
     );
     this.player.setScale(2);
     this.player.body.allowGravity = false;
@@ -804,12 +807,12 @@ class HouseScene extends Phaser.Scene {
       this.exitDoor.height * 0.5
     );
     
-    // Add interaction with exit door
+    // Add interaction with exit door - add the canExitHouse check function
     this.physics.add.overlap(
       this.player, 
       this.exitDoor, 
       this.exitHouse, 
-      null, 
+      this.canExitHouse, 
       this
     );
     
@@ -970,6 +973,12 @@ class HouseScene extends Phaser.Scene {
           up.isDown || W.isDown || down.isDown || S.isDown)) {
       this.player.anims.stop();
     }
+  }
+
+  // Add new function to prevent exit overlap from triggering immediately
+  canExitHouse() {
+    // Only allow exit if the flag is active
+    return this.exitActive && !isTransitioning;
   }
 }
 
