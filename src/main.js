@@ -1,10 +1,15 @@
+// Import statements first
+import './style.css';
+import Phaser from 'phaser';
+
 // ===================== GLOBAL VARIABLES & SETUP =====================
 let playerName = "";
 let isNameInputActive = true; // Default to true since name input starts active
-
-// DOM element references
-const gameStartBtn = document.getElementById("gameStartBtn");
-const gameStartDiv = document.getElementById("gameStartDiv");
+let isLoadingHouse = false;
+let isTransitioning = false; // New flag to disable movement during transitions
+let game; // Define game variable outside so we can access it later
+let lastPlayerPos = { x: 100, y: 100 };
+let lastHousePos = { x: 250, y: 250 }; // Center of house, away from exit door
 
 // Game constants
 const GAME_SIZE = {
@@ -18,43 +23,69 @@ const WORLD_SIZE = {
 const SPEED_DOWN = 300;
 const PLAYER_SPEED = SPEED_DOWN + 50;
 
-// ===================== NAME INPUT HANDLERS =====================
-document.getElementById('playerName').addEventListener('focus', () => {
-  isNameInputActive = true;
-});
+// Wait for DOM to be fully loaded before accessing elements
+document.addEventListener('DOMContentLoaded', function() {
+  // DOM element references
+  const gameStartBtn = document.getElementById("gameStartBtn");
+  const gameStartDiv = document.getElementById("gameStartDiv");
+  const gameCanvas = document.getElementById("gameCanvas");
 
-document.getElementById('playerName').addEventListener('blur', () => {
-  isNameInputActive = false;
-});
+  // ===================== NAME INPUT HANDLERS =====================
+  document.getElementById('playerName').addEventListener('focus', () => {
+    isNameInputActive = true;
+  });
 
-gameStartBtn.addEventListener("click", () => {
-  const inputName = document.getElementById('playerName').value.trim();
+  document.getElementById('playerName').addEventListener('blur', () => {
+    isNameInputActive = false;
+  });
 
-  if (!inputName) {
-    alert("Please enter your name!");
-  } else {
-    playerName = inputName;
-    console.log(`Player's name: ${playerName}`);
-    gameStartDiv.style.display = "none";
-    
-    // Delay to ensure UI updates before resuming game
-    setTimeout(() => {
-      isNameInputActive = false;
-      console.log("isNameInputActive set to false");
-      game.scene.resume("scene-game");
-    }, 100);
-  }
-});
+  gameStartBtn.addEventListener("click", () => {
+    const inputName = document.getElementById('playerName').value.trim();
 
-// ===================== RESTART BUTTON HANDLER =====================
-document.getElementById("restartGameBtn").addEventListener("click", () => {
-  location.reload();
+    if (!inputName) {
+      alert("Please enter your name!");
+    } else {
+      playerName = inputName;
+      console.log(`Player's name: ${playerName}`);
+      gameStartDiv.style.display = "none";
+      
+      // Delay to ensure UI updates before resuming game
+      setTimeout(() => {
+        isNameInputActive = false;
+        console.log("isNameInputActive set to false");
+        game.scene.resume("scene-game");
+      }, 100);
+    }
+  });
+
+  // ===================== RESTART BUTTON HANDLER =====================
+  document.getElementById("restartGameBtn").addEventListener("click", () => {
+    location.reload();
+  });
+
+  // ===================== GAME INITIALIZATION =====================
+  const config = {
+    type: Phaser.WEBGL,
+    width: GAME_SIZE.width,
+    height: GAME_SIZE.height,
+    canvas: gameCanvas,
+    physics: {
+      default: "arcade",
+      arcade: {
+        gravity: { y: SPEED_DOWN },
+        debug: true,
+        fps: 60,
+        tileBias: 32
+      }
+    },
+    scene: [GameScene, HouseScene]
+  };
+
+  // Initialize the game
+  game = new Phaser.Game(config);
 });
 
 // ===================== GAME SCENE CLASS =====================
-import './style.css';
-import Phaser from 'phaser';
-
 class GameScene extends Phaser.Scene {
   constructor() {
     super("scene-game");
@@ -116,8 +147,16 @@ class GameScene extends Phaser.Scene {
   }
 
   create() {
-    // Initially pause game until name is entered
-    this.scene.pause("scene-game");
+    console.log("Game scene create called");
+    
+    // Reset transition flag when game scene is created
+    isTransitioning = false;
+    isLoadingHouse = false;
+    
+    // Only pause if this is the initial game load
+    if (isNameInputActive) {
+      this.scene.pause("scene-game");
+    }
     
     // Create UI container first (but add elements later)
     this.uiContainer = this.add.container(0, 0);
@@ -141,15 +180,6 @@ class GameScene extends Phaser.Scene {
     
     // Create house
     this.createHouse();
-
-    // Add collision between player and house
-    this.physics.add.collider(
-      this.player, 
-      this.house, 
-      null, 
-      () => true, 
-      this
-    );
 
     // Setup camera and minimap
     this.setupCamera();
@@ -183,9 +213,23 @@ class GameScene extends Phaser.Scene {
     // Sound effects
     this.coinMusic = this.sound.add("coin");
     
-    // Background music
-    this.bgMusic = this.sound.add("bgMusic");
-    this.bgMusic.play();
+    // Background music - only play if not already playing
+    if (!this.bgMusic || !this.bgMusic.isPlaying) {
+      try {
+        // Stop any existing background music first
+        if (this.bgMusic) {
+          this.bgMusic.stop();
+        }
+        
+        this.bgMusic = this.sound.add("bgMusic", {
+          loop: true,
+          volume: 0.5
+        });
+        this.bgMusic.play();
+      } catch (error) {
+        console.error("Error playing background music:", error);
+      }
+    }
   }
   
   createEnvironment() {
@@ -225,9 +269,6 @@ class GameScene extends Phaser.Scene {
         house.width * 0.15,
         house.height * 0.4
       );
-      
-      // Add collision with player
-      this.physics.add.collider(this.player, house);
     });
   }
   
@@ -248,6 +289,15 @@ class GameScene extends Phaser.Scene {
     this.house.body.setOffset(
       this.house.width * 0.15,
       this.house.height * 0.4
+    );
+    
+    // Add overlap (instead of collision) for house entry
+    this.physics.add.overlap(
+      this.player, 
+      this.house, 
+      this.enterHouse, 
+      this.canEnterHouse, 
+      this
     );
   }
 
@@ -299,8 +349,8 @@ class GameScene extends Phaser.Scene {
     // Create player animations
     this.createPlayerAnimations();
     
-    // Create player sprite
-    this.player = this.physics.add.sprite(100, 100, 'player');
+    // Create player sprite - use the saved position if returning from house
+    this.player = this.physics.add.sprite(lastPlayerPos.x, lastPlayerPos.y, 'player');
     this.player.setScale(2);
     this.player.setImmovable(false);
     this.player.body.allowGravity = false;
@@ -418,7 +468,10 @@ class GameScene extends Phaser.Scene {
   }
   
   createEmitter() {
-    this.emitter = this.add.particles(0, 0, "money", {
+    // Check if 'money' texture exists, if not, use a generic particle
+    const particleKey = this.textures.exists('money') ? 'money' : 'player';
+    
+    this.emitter = this.add.particles(0, 0, particleKey, {
       speed: 100,
       gravityY: SPEED_DOWN - 200,
       scale: 0.04,
@@ -522,8 +575,8 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
-    // Skip movement if name input is active
-    if (isNameInputActive) {
+    // Skip movement if name input is active or during transitions
+    if (isNameInputActive || isTransitioning) {
       return;
     }
 
@@ -579,24 +632,364 @@ class GameScene extends Phaser.Scene {
       this.player.anims.stop();
     }
   }
+
+  // Add this function to GameScene to handle house entry
+  canEnterHouse() {
+    // Check if player is near the door - add extra conditions if needed
+    return !isLoadingHouse;
+  }
+
+  // Add this function to GameScene to handle house entry
+  enterHouse() {
+    if (isLoadingHouse || isTransitioning) return;
+    
+    // Store current player position before entering house
+    lastPlayerPos = { 
+      x: this.player.x, 
+      y: this.player.y + 50 // Add offset to prevent player from getting stuck in house collision
+    };
+    
+    // Set transition flags to prevent movement and multiple triggers
+    isLoadingHouse = true;
+    isTransitioning = true;
+    
+    // Stop player movement immediately
+    this.player.setVelocity(0);
+    this.player.anims.stop();
+    
+    // Create a loading screen overlay
+    const loadingScreen = this.add.rectangle(
+      0, 0, 
+      GAME_SIZE.width, GAME_SIZE.height, 
+      0x000000, 0.8
+    );
+    loadingScreen.setOrigin(0, 0);
+    loadingScreen.setScrollFactor(0);
+    loadingScreen.setDepth(1000);
+    
+    const loadingText = this.add.text(
+      GAME_SIZE.width/2, GAME_SIZE.height/2, 
+      "Entering house...", 
+      { font: "24px Arial", fill: "#ffffff" }
+    );
+    loadingText.setOrigin(0.5);
+    loadingText.setScrollFactor(0);
+    loadingText.setDepth(1001);
+    
+    // Wait a moment before transitioning to house scene
+    this.time.delayedCall(1500, () => {
+      isLoadingHouse = false;
+      // Keep isTransitioning true until the house scene has fully loaded
+      this.scene.start("scene-house");
+    });
+  }
 }
 
-// ===================== GAME INITIALIZATION =====================
-const config = {
-  type: Phaser.WEBGL,
-  width: GAME_SIZE.width,
-  height: GAME_SIZE.height,
-  canvas: gameCanvas,
-  physics: {
-    default: "arcade",
-    arcade: {
-      gravity: { y: SPEED_DOWN },
-      debug: true,
-      fps: 60,
-      tileBias: 32
+// ===================== HOUSE SCENE CLASS =====================
+class HouseScene extends Phaser.Scene {
+  constructor() {
+    super("scene-house");
+    
+    // Player properties
+    this.player = null;
+    this.playerSpeed = PLAYER_SPEED;
+    
+    // Input controls
+    this.cursor = null;
+    this.wasd = null;
+    
+    // Game state
+    this.isGameOver = false;
+    this.exitDoor = null;
+  }
+  
+  create() {
+    // Reset transition flag when house scene is created
+    isTransitioning = false;
+    
+    // Create a house floor
+    const floorTile = this.add.rectangle(0, 0, 500, 500, 0xc2a37c);
+    floorTile.setOrigin(0, 0);
+    
+    // Add walls
+    this.createWalls();
+    
+    // Create player
+    this.createPlayer();
+    
+    // Create exit door
+    this.createExitDoor();
+    
+    // Setup camera
+    this.cameras.main.startFollow(this.player);
+    this.cameras.main.setBounds(0, 0, 500, 500);
+    
+    // Setup controls
+    this.setupControls();
+    
+    // Add furniture and decorations
+    this.createFurniture();
+    
+    // Add greeting text
+    const houseGreeting = this.add.text(
+      250, 30, 
+      `Welcome home, ${playerName}!`, 
+      { font: "20px Arial", fill: "#000000" }
+    );
+    houseGreeting.setOrigin(0.5, 0);
+    houseGreeting.setScrollFactor(0);
+    
+    // Add a brief delay before exit is active to prevent immediate exit
+    this.exitActive = false;
+    this.time.delayedCall(1000, () => {
+      this.exitActive = true;
+    });
+  }
+  
+  createWalls() {
+    // Create wall graphics
+    const walls = this.physics.add.staticGroup();
+    
+    // Top wall
+    walls.add(this.add.rectangle(0, 0, 500, 20, 0x8c6d46));
+    // Bottom wall
+    walls.add(this.add.rectangle(0, 480, 500, 20, 0x8c6d46));
+    // Left wall
+    walls.add(this.add.rectangle(0, 0, 20, 500, 0x8c6d46));
+    // Right wall
+    walls.add(this.add.rectangle(480, 0, 20, 500, 0x8c6d46));
+    
+    // Set wall origins
+    walls.getChildren().forEach(wall => {
+      wall.setOrigin(0, 0);
+    });
+    
+    this.walls = walls;
+  }
+  
+  createPlayer() {
+    // Create player sprite - use saved position or default
+    this.player = this.physics.add.sprite(
+      lastHousePos.x, lastHousePos.y, 'player'
+    );
+    this.player.setScale(2);
+    this.player.body.allowGravity = false;
+    this.player.setCollideWorldBounds(true);
+    
+    // Add collision with walls
+    this.physics.add.collider(this.player, this.walls);
+    
+    // Adjust player collision box
+    this.player.body.setSize(
+      this.player.width * 0.6, 
+      this.player.height * 0.5
+    );
+    this.player.body.setOffset(
+      this.player.width * 0.2, 
+      this.player.height * 0.5
+    );
+  }
+  
+  createExitDoor() {
+    // Create exit door at the bottom of the house
+    this.exitDoor = this.physics.add.sprite(250, 460, 'player');
+    this.exitDoor.setScale(2);
+    this.exitDoor.setTint(0x964B00);
+    this.exitDoor.setImmovable(true);
+    this.exitDoor.body.allowGravity = false;
+    
+    // Make the door hitbox smaller
+    this.exitDoor.body.setSize(
+      this.exitDoor.width * 0.5,
+      this.exitDoor.height * 0.5
+    );
+    
+    // Add interaction with exit door
+    this.physics.add.overlap(
+      this.player, 
+      this.exitDoor, 
+      this.exitHouse, 
+      null, 
+      this
+    );
+    
+    // Add door text and make it more visible
+    const doorText = this.add.text(
+      250, 430, 
+      "Exit", 
+      { font: "18px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 4 }
+    );
+    doorText.setOrigin(0.5, 0);
+    
+    // Add a visual indicator for the door
+    const doorArrow = this.add.text(
+      250, 415,
+      "⬇️",
+      { font: "16px Arial" }
+    );
+    doorArrow.setOrigin(0.5, 0);
+  }
+  
+  createFurniture() {
+    // Add some basic furniture
+    // Bed
+    const bed = this.add.rectangle(400, 100, 80, 120, 0x6d9eeb);
+    // Table
+    const table = this.add.rectangle(150, 200, 100, 60, 0xa52a2a);
+    // Chair
+    const chair = this.add.rectangle(150, 270, 40, 40, 0xa52a2a);
+    
+    // Make furniture collidable
+    [bed, table, chair].forEach(item => {
+      this.physics.add.existing(item, true);
+      this.physics.add.collider(this.player, item);
+    });
+  }
+  
+  setupControls() {
+    this.cursor = this.input.keyboard.createCursorKeys();
+    this.wasd = this.input.keyboard.addKeys({
+      up: Phaser.Input.Keyboard.KeyCodes.W,
+      left: Phaser.Input.Keyboard.KeyCodes.A,
+      down: Phaser.Input.Keyboard.KeyCodes.S,
+      right: Phaser.Input.Keyboard.KeyCodes.D
+    });
+  }
+  
+  exitHouse() {
+    // Don't allow exit if not active yet or during transition
+    if (!this.exitActive || isTransitioning) return;
+    
+    // Store house position before exiting
+    lastHousePos = { x: this.player.x, y: this.player.y };
+    
+    // Set transition flag to prevent movement
+    isTransitioning = true;
+    
+    // Start the safety timer
+    addSafetyResetTimer();
+    
+    // Stop player movement immediately
+    this.player.setVelocity(0);
+    this.player.anims.stop();
+    
+    // Create a loading screen
+    const loadingScreen = this.add.rectangle(
+      0, 0, 
+      GAME_SIZE.width, GAME_SIZE.height, 
+      0x000000, 0.8
+    );
+    loadingScreen.setOrigin(0, 0);
+    loadingScreen.setScrollFactor(0);
+    loadingScreen.setDepth(1000);
+    
+    const loadingText = this.add.text(
+      GAME_SIZE.width/2, GAME_SIZE.height/2, 
+      "Exiting house...", 
+      { font: "24px Arial", fill: "#ffffff" }
+    );
+    loadingText.setOrigin(0.5);
+    loadingText.setScrollFactor(0);
+    loadingText.setDepth(1001);
+    
+    // Wait a moment, then switch back to the game scene
+    this.time.delayedCall(1000, () => {
+      // Properly shut down current scene and restart the game scene
+      try {
+        // Stop all running timers
+        this.time.removeAllEvents();
+        
+        // Remove all game objects
+        this.children.removeAll(true);
+        
+        // Switch to the game scene with a restart
+        this.scene.stop('scene-house');
+        this.scene.start('scene-game');
+        
+        console.log("Transition to main game complete");
+      } catch (error) {
+        console.error("Error during scene transition:", error);
+      }
+    });
+  }
+  
+  update() {
+    // Skip movement during transitions
+    if (isTransitioning) {
+      return;
     }
-  },
-  scene: [GameScene]
-};
+    
+    this.handlePlayerMovement();
+  }
+  
+  handlePlayerMovement() {
+    const { left, right, up, down } = this.cursor;
+    const { left: A, right: D, up: W, down: S } = this.wasd;
 
-const game = new Phaser.Game(config);
+    // Reset velocity
+    this.player.setVelocity(0);
+
+    // Calculate movement speed
+    let speed = this.playerSpeed;
+    
+    // Handle diagonal movement (normalize speed)
+    const isDiagonal = 
+      (left.isDown || A.isDown || right.isDown || D.isDown) && 
+      (up.isDown || W.isDown || down.isDown || S.isDown);
+    
+    if (isDiagonal) {
+      speed = speed * 0.7071; // Approximately 1/sqrt(2)
+    }
+
+    // Handle horizontal movement
+    if (left.isDown || A.isDown) {
+      this.player.setVelocityX(-speed);
+      this.player.setFlipX(true);
+      if (!(up.isDown || W.isDown || down.isDown || S.isDown)) {
+        this.player.anims.play('walk-right', true);
+      }
+    } else if (right.isDown || D.isDown) {
+      this.player.setVelocityX(speed);
+      this.player.setFlipX(false);
+      if (!(up.isDown || W.isDown || down.isDown || S.isDown)) {
+        this.player.anims.play('walk-right', true);
+      }
+    }
+
+    // Handle vertical movement
+    if (up.isDown || W.isDown) {
+      this.player.setVelocityY(-speed);
+      this.player.anims.play('walk-up', true);
+    } else if (down.isDown || S.isDown) {
+      this.player.setVelocityY(speed);
+      this.player.anims.play('walk-down', true);
+    }
+    
+    // If no movement keys are pressed, stop animations
+    if (!(left.isDown || A.isDown || right.isDown || D.isDown || 
+          up.isDown || W.isDown || down.isDown || S.isDown)) {
+      this.player.anims.stop();
+    }
+  }
+}
+
+// Add a global safety timer function at the top level
+function addSafetyResetTimer() {
+  // If transition takes too long, force a reset
+  console.log("Safety timer started");
+  setTimeout(() => {
+    if (isTransitioning) {
+      console.log("Safety timeout triggered - resetting game state");
+      isTransitioning = false;
+      isLoadingHouse = false;
+      if (game && game.scene) {
+        try {
+          game.scene.start('scene-game');
+        } catch (error) {
+          console.error("Error resetting game:", error);
+          location.reload(); // Last resort - reload the page
+        }
+      }
+    }
+  }, 5000); // 5 seconds timeout
+}
