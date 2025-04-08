@@ -68,6 +68,80 @@ main{
   width: 100%;
   padding: 8px;
   font-size: 16px;
+  margin-bottom: 20px;
+}
+
+/* Character selection styles */
+#characterSelection {
+  width: 100%;
+  max-width: 600px;
+  margin: 20px 0;
+}
+
+.character-container {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin: 15px 0;
+}
+
+.character-card {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 20px;
+  width: 160px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.character-card:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-5px);
+}
+
+.character-card.selected {
+  border-color: #ffcc00;
+  box-shadow: 0 0 15px rgba(255, 204, 0, 0.5);
+}
+
+.character-img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  display: block;
+  image-rendering: pixelated;
+  margin: 0 auto;
+  margin-bottom: 5px;
+  transform: scale(2);
+  transform-origin: center;
+}
+
+.character-img.budi {
+  filter: hue-rotate(200deg);
+}
+
+.character-img.doni {
+  filter: hue-rotate(35deg) saturate(2);
+}
+
+.character-name {
+  font-weight: bold;
+  margin-top: 10px;
+  font-size: 18px;
+}
+
+.character-desc {
+  font-size: 12px;
+  margin-top: 5px;
+  color: #cccccc;
+}
+
+.character-card input[type="radio"] {
+  display: none;
 }
 
 #gameEndDiv {
@@ -76,12 +150,18 @@ main{
 
 #gameStartBtn {
   display: inline-block;
-  width: 100px;
-  padding: 8px 15px;
+  width: 150px;
+  padding: 12px 15px;
   margin: 20px;
   text-align: center;
   font-family: inherit;
   border-radius: 10px;
+  background-color: #ffcc00;
+  color: #333;
+  font-weight: bold;
+  font-size: 18px;
+  border: none;
+  transition: all 0.3s ease;
 }
 
 #gameStartBtn p {
@@ -89,9 +169,8 @@ main{
 }
 
 #gameStartBtn:hover {
-  background-color: var(--dkClr);
-  border: 0.5px solid var(--liClr);
-  color: var(--liClr);
+  background-color: #ffd700;
+  transform: scale(1.05);
   cursor: pointer;
 }
 

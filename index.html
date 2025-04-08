@@ -27,11 +27,31 @@
         <!-- Seleksi Karakter -->
         <div id="characterSelection">
           <h3>Select a Character:</h3>
-          <select id="characterSelect">
+          <div class="character-container">
+            <div class="character-card" data-character="ucup">
+              <img src="/assets/Player/Player.png" alt="Ucup" class="character-img" />
+              <div class="character-name">Ucup</div>
+              <div class="character-desc">A brave explorer</div>
+              <input type="radio" name="characterChoice" value="ucup" id="ucup-choice" checked />
+            </div>
+            <div class="character-card" data-character="budi">
+              <img src="/assets/Player/Player.png" alt="Budi" class="character-img budi" />
+              <div class="character-name">Budi</div>
+              <div class="character-desc">A wise adventurer</div>
+              <input type="radio" name="characterChoice" value="budi" id="budi-choice" />
+            </div>
+            <div class="character-card" data-character="doni">
+              <img src="/assets/Player/Player.png" alt="Doni" class="character-img doni" />
+              <div class="character-name">Doni</div>
+              <div class="character-desc">A fearless traveler</div>
+              <input type="radio" name="characterChoice" value="doni" id="doni-choice" />
+            </div>
+          </div>
+          <!-- Hidden select element for compatibility with existing code -->
+          <select id="characterSelect" style="display: none;">
             <option value="ucup">Ucup</option>
             <option value="budi">Budi</option>
             <option value="doni">Doni</option>
-            <!-- Tambahkan lebih banyak karakter jika perlu -->
           </select>
         </div>
 

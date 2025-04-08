@@ -4,6 +4,7 @@ import Phaser from 'phaser';
 
 // ===================== GLOBAL VARIABLES & SETUP =====================
 let playerName = "";
+let selectedCharacter = "ucup"; // Default character
 let isNameInputActive = true; // Default to true since name input starts active
 let isLoadingHouse = false;
 let isTransitioning = false; // New flag to disable movement during transitions
@@ -23,12 +24,57 @@ const WORLD_SIZE = {
 const SPEED_DOWN = 300;
 const PLAYER_SPEED = SPEED_DOWN + 50;
 
+// Character sprite configurations
+const CHARACTER_SPRITES = {
+  ucup: { spritesheet: 'player', scale: 2 },
+  budi: { spritesheet: 'player', scale: 2, tint: 0xadd8e6 }, // Light blue tint
+  doni: { spritesheet: 'player', scale: 2, tint: 0xffa500 }  // Orange tint
+};
+
+// Function to extract front-facing sprite from spritesheet
+function extractFrontSprite(imageUrl, callback) {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = function() {
+    // Create canvas with padding for better centering
+    const canvas = document.createElement('canvas');
+    // Increase canvas size for higher quality
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    
+    // Clear canvas with transparent background
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Extract the front-facing sprite (frame 1 - more centered facing front)
+    // The spritesheet has 6 frames per row, frames 0-5 are walking down animations
+    // Frame 1 is a good centered front-facing pose
+    ctx.drawImage(img, 32 * 1, 0, 32, 32, 0, 0, 32, 32);
+    
+    // Create a new image with the extracted sprite
+    const frontSprite = new Image();
+    frontSprite.src = canvas.toDataURL('image/png');
+    callback(frontSprite);
+  };
+  img.src = imageUrl;
+}
+
 // Wait for DOM to be fully loaded before accessing elements
 document.addEventListener('DOMContentLoaded', function() {
   // DOM element references
   const gameStartBtn = document.getElementById("gameStartBtn");
   const gameStartDiv = document.getElementById("gameStartDiv");
   const gameCanvas = document.getElementById("gameCanvas");
+  const characterSelect = document.getElementById("characterSelect");
+  const characterCards = document.querySelectorAll(".character-card");
+
+  // Extract and set front-facing sprites for character selection
+  extractFrontSprite('/assets/Player/Player.png', (frontSprite) => {
+    characterCards.forEach(card => {
+      const img = card.querySelector('.character-img');
+      img.src = frontSprite.src;
+    });
+  });
 
   // ===================== NAME INPUT HANDLERS =====================
   document.getElementById('playerName').addEventListener('focus', () => {
@@ -39,6 +85,51 @@ document.addEventListener('DOMContentLoaded', function() {
     isNameInputActive = false;
   });
 
+  // ===================== CHARACTER SELECTION HANDLER =====================
+  // Handle character card selection
+  characterCards.forEach(card => {
+    const character = card.getAttribute('data-character');
+    
+    // Mark the default character as selected
+    if (character === selectedCharacter) {
+      card.classList.add('selected');
+      document.getElementById(`${character}-choice`).checked = true;
+    }
+    
+    card.addEventListener('click', () => {
+      // Update selection visually
+      characterCards.forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      
+      // Update the radio button
+      document.getElementById(`${character}-choice`).checked = true;
+      
+      // Update the hidden select element to maintain compatibility
+      characterSelect.value = character;
+      
+      // Update the global variable
+      selectedCharacter = character;
+      console.log(`Character selected: ${selectedCharacter}`);
+    });
+  });
+
+  // Keep the hidden select in sync (for backwards compatibility)
+  characterSelect.addEventListener("change", () => {
+    selectedCharacter = characterSelect.value;
+    console.log(`Character selected via dropdown: ${selectedCharacter}`);
+    
+    // Update the visual selection
+    characterCards.forEach(card => {
+      const cardCharacter = card.getAttribute('data-character');
+      if (cardCharacter === selectedCharacter) {
+        card.classList.add('selected');
+        document.getElementById(`${cardCharacter}-choice`).checked = true;
+      } else {
+        card.classList.remove('selected');
+      }
+    });
+  });
+
   gameStartBtn.addEventListener("click", () => {
     const inputName = document.getElementById('playerName').value.trim();
 
@@ -47,6 +138,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
       playerName = inputName;
       console.log(`Player's name: ${playerName}`);
+      console.log(`Selected character: ${selectedCharacter}`);
       gameStartDiv.style.display = "none";
       
       // Delay to ensure UI updates before resuming game
@@ -350,7 +442,13 @@ class GameScene extends Phaser.Scene {
     
     // Create player sprite - use the saved position if returning from house
     this.player = this.physics.add.sprite(lastPlayerPos.x, lastPlayerPos.y, 'player');
-    this.player.setScale(2);
+    this.player.setScale(CHARACTER_SPRITES[selectedCharacter].scale);
+    
+    // Apply character tint if specified
+    if (CHARACTER_SPRITES[selectedCharacter].tint) {
+      this.player.setTint(CHARACTER_SPRITES[selectedCharacter].tint);
+    }
+    
     this.player.setImmovable(false);
     this.player.body.allowGravity = false;
     this.player.setCollideWorldBounds(true);
@@ -765,7 +863,13 @@ class HouseScene extends Phaser.Scene {
       Math.min(lastHousePos.y, 350), // Ensure player doesn't spawn below y=350 to stay away from exit
       'player'
     );
-    this.player.setScale(2);
+    this.player.setScale(CHARACTER_SPRITES[selectedCharacter].scale);
+    
+    // Apply character tint if specified
+    if (CHARACTER_SPRITES[selectedCharacter].tint) {
+      this.player.setTint(CHARACTER_SPRITES[selectedCharacter].tint);
+    }
+    
     this.player.body.allowGravity = false;
     this.player.setCollideWorldBounds(true);
     
