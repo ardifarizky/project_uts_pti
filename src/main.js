@@ -12,6 +12,7 @@ let game; // Define game variable outside so we can access it later
 let lastPlayerPos = { x: 100, y: 100 };
 let lastHousePos = { x: 250, y: 250 }; // Center of house, away from exit door
 let minimapVisible = true; // Add tracking variable for minimap visibility
+let isSettingsMenuOpen = false; // Track if settings menu is open
 
 // Game constants
 const GAME_SIZE = {
@@ -112,7 +113,34 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
     }
+    
+    // Settings menu handler (ESC key)
+    if (event.key === 'Escape') {
+      // Only toggle settings if name input is not active and game has started
+      if (!isNameInputActive && game && game.scene.scenes) {
+        // Find the active game scene
+        const activeScene = game.scene.scenes.find(scene => (scene.scene.key === 'scene-game' || scene.scene.key === 'scene-house') && scene.scene.isActive());
+        
+        if (activeScene) {
+          // Toggle settings menu
+          isSettingsMenuOpen = !isSettingsMenuOpen;
+          
+          if (isSettingsMenuOpen) {
+            // Pause the game and show settings
+            activeScene.scene.pause();
+            showSettingsMenu(activeScene);
+          } else {
+            // Resume the game and hide settings
+            hideSettingsMenu();
+            activeScene.scene.resume();
+          }
+        }
+      }
+    }
   });
+
+  // Create settings menu elements (initially hidden)
+  createSettingsMenu();
 
   // ===================== CHARACTER SELECTION HANDLER =====================
   // Handle character card selection
@@ -1126,4 +1154,183 @@ function addSafetyResetTimer() {
       }
     }
   }, 5000); // 5 seconds timeout
+}
+
+// Create settings menu elements
+function createSettingsMenu() {
+  // Create settings menu container
+  const settingsMenu = document.createElement('div');
+  settingsMenu.id = 'settingsMenu';
+  settingsMenu.style.position = 'absolute';
+  settingsMenu.style.top = '50%';
+  settingsMenu.style.left = '50%';
+  settingsMenu.style.transform = 'translate(-50%, -50%)';
+  settingsMenu.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+  settingsMenu.style.padding = '20px';
+  settingsMenu.style.borderRadius = '10px';
+  settingsMenu.style.color = '#ffffff';
+  settingsMenu.style.display = 'none';
+  settingsMenu.style.zIndex = '1000';
+  settingsMenu.style.width = '300px';
+  settingsMenu.style.textAlign = 'center';
+  
+  // Add title
+  const title = document.createElement('h2');
+  title.textContent = 'Settings';
+  title.style.marginBottom = '20px';
+  settingsMenu.appendChild(title);
+  
+  // Minimap toggle option
+  const minimapDiv = document.createElement('div');
+  minimapDiv.style.marginBottom = '15px';
+  
+  const minimapLabel = document.createElement('label');
+  minimapLabel.textContent = 'Minimap: ';
+  minimapLabel.style.marginRight = '10px';
+  
+  const minimapToggle = document.createElement('button');
+  minimapToggle.textContent = 'Toggle';
+  minimapToggle.style.padding = '5px 10px';
+  minimapToggle.style.backgroundColor = '#4CAF50';
+  minimapToggle.style.border = 'none';
+  minimapToggle.style.borderRadius = '5px';
+  minimapToggle.style.cursor = 'pointer';
+  
+  minimapToggle.addEventListener('click', () => {
+    // Toggle minimap using the same logic as M key press
+    if (game && game.scene.scenes) {
+      const gameScene = game.scene.scenes.find(scene => scene.scene.key === 'scene-game');
+      if (gameScene) {
+        minimapVisible = !minimapVisible;
+        
+        if (gameScene.minimapCamera) {
+          gameScene.minimapCamera.visible = minimapVisible;
+        }
+        
+        if (gameScene.minimapBorder) {
+          gameScene.minimapBorder.visible = minimapVisible;
+        }
+        
+        if (gameScene.minimapText) {
+          gameScene.minimapText.visible = minimapVisible;
+        }
+        
+        minimapStatus.textContent = minimapVisible ? 'ON' : 'OFF';
+      }
+    }
+  });
+  
+  const minimapStatus = document.createElement('span');
+  minimapStatus.style.marginLeft = '10px';
+  minimapStatus.textContent = 'ON';
+  
+  minimapDiv.appendChild(minimapLabel);
+  minimapDiv.appendChild(minimapToggle);
+  minimapDiv.appendChild(minimapStatus);
+  
+  // Volume control
+  const volumeDiv = document.createElement('div');
+  volumeDiv.style.marginBottom = '15px';
+  
+  const volumeLabel = document.createElement('label');
+  volumeLabel.textContent = 'Volume: ';
+  volumeLabel.style.marginRight = '10px';
+  
+  const volumeSlider = document.createElement('input');
+  volumeSlider.type = 'range';
+  volumeSlider.min = '0';
+  volumeSlider.max = '100';
+  volumeSlider.value = '50';
+  volumeSlider.style.verticalAlign = 'middle';
+  
+  const volumeValue = document.createElement('span');
+  volumeValue.style.marginLeft = '10px';
+  volumeValue.textContent = '50%';
+  
+  volumeSlider.addEventListener('input', (e) => {
+    const volume = e.target.value;
+    volumeValue.textContent = volume + '%';
+    
+    // Update game volume if available
+    if (game && game.sound) {
+      game.sound.volume = volume / 100;
+    }
+  });
+  
+  volumeDiv.appendChild(volumeLabel);
+  volumeDiv.appendChild(volumeSlider);
+  volumeDiv.appendChild(volumeValue);
+  
+  // Resume button
+  const resumeButton = document.createElement('button');
+  resumeButton.textContent = 'Resume Game';
+  resumeButton.style.padding = '10px 15px';
+  resumeButton.style.backgroundColor = '#4CAF50';
+  resumeButton.style.border = 'none';
+  resumeButton.style.borderRadius = '5px';
+  resumeButton.style.cursor = 'pointer';
+  resumeButton.style.marginTop = '15px';
+  resumeButton.style.marginRight = '10px';
+  
+  resumeButton.addEventListener('click', () => {
+    hideSettingsMenu();
+    isSettingsMenuOpen = false;
+    
+    // Find and resume active scene
+    if (game && game.scene.scenes) {
+      const pausedScene = game.scene.scenes.find(scene => 
+        (scene.scene.key === 'scene-game' || scene.scene.key === 'scene-house') && 
+        scene.scene.isPaused()
+      );
+      
+      if (pausedScene) {
+        pausedScene.scene.resume();
+      }
+    }
+  });
+  
+  // Main menu button
+  const mainMenuButton = document.createElement('button');
+  mainMenuButton.textContent = 'Main Menu';
+  mainMenuButton.style.padding = '10px 15px';
+  mainMenuButton.style.backgroundColor = '#f44336';
+  mainMenuButton.style.border = 'none';
+  mainMenuButton.style.borderRadius = '5px';
+  mainMenuButton.style.cursor = 'pointer';
+  mainMenuButton.style.marginTop = '15px';
+  
+  mainMenuButton.addEventListener('click', () => {
+    // Reload the page to return to main menu
+    location.reload();
+  });
+  
+  // Add all elements to settings menu
+  settingsMenu.appendChild(minimapDiv);
+  settingsMenu.appendChild(volumeDiv);
+  settingsMenu.appendChild(resumeButton);
+  settingsMenu.appendChild(mainMenuButton);
+  
+  // Add the settings menu to the document body
+  document.body.appendChild(settingsMenu);
+}
+
+function showSettingsMenu(activeScene) {
+  const settingsMenu = document.getElementById('settingsMenu');
+  if (settingsMenu) {
+    // Update minimap status before showing
+    const minimapStatus = settingsMenu.querySelector('span:nth-of-type(1)');
+    if (minimapStatus) {
+      minimapStatus.textContent = minimapVisible ? 'ON' : 'OFF';
+    }
+    
+    // Show the menu
+    settingsMenu.style.display = 'block';
+  }
+}
+
+function hideSettingsMenu() {
+  const settingsMenu = document.getElementById('settingsMenu');
+  if (settingsMenu) {
+    settingsMenu.style.display = 'none';
+  }
 }
