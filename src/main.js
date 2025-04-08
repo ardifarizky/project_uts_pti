@@ -13,11 +13,13 @@ let lastPlayerPos = { x: 100, y: 100 };
 let lastHousePos = { x: 250, y: 250 }; // Center of house, away from exit door
 let minimapVisible = true; // Add tracking variable for minimap visibility
 let isSettingsMenuOpen = false; // Track if settings menu is open
+let timeMultiplier = 1; // Time multiplier for developer tools
+let showDevTools = false; // Track if dev tools are visible
 
 // Game constants
 const GAME_SIZE = {
-  width: 500,
-  height: 500
+  width: 960,
+  height: 540
 };
 const WORLD_SIZE = {
   width: 1600,
@@ -135,6 +137,34 @@ document.addEventListener('DOMContentLoaded', function() {
             activeScene.scene.resume();
           }
         }
+      }
+    }
+    
+    // Developer tools toggle with backtick key
+    if (event.key === '`') {
+      // Toggle developer tools
+      showDevTools = !showDevTools;
+      updateDevToolsDisplay();
+    }
+    
+    // Only handle dev tool keys if dev tools are active
+    if (showDevTools && !isNameInputActive) {
+      // Speed up time with = key
+      if (event.key === '=' || event.key === '+') {
+        timeMultiplier = Math.min(timeMultiplier + 1, 10);
+        updateDevToolsDisplay();
+      }
+      
+      // Slow down time with - key
+      if (event.key === '-' || event.key === '_') {
+        timeMultiplier = Math.max(timeMultiplier - 1, 1);
+        updateDevToolsDisplay();
+      }
+      
+      // Reset time multiplier with 0 key
+      if (event.key === '0') {
+        timeMultiplier = 1;
+        updateDevToolsDisplay();
       }
     }
   });
@@ -453,7 +483,7 @@ class GameScene extends Phaser.Scene {
     // Create greeting and time labels
     this.greetingLabel = this.add.text(10, 10, "", { font: "20px Arial", fill: "#ffffff" });
     this.timeLabel = this.add.text(10, 40, "", { font: "20px Arial", fill: "#ffffff" });
-    this.moneyText = this.add.text(370, 10, `Money: $${this.money}`, { font: "20px Arial", fill: "#ffffff" });
+    this.moneyText = this.add.text(GAME_SIZE.width - 150, 10, `Money: $${this.money}`, { font: "20px Arial", fill: "#ffffff" });
     
     // Add labels to UI container
     this.uiContainer.add([this.greetingLabel, this.timeLabel, this.moneyText]);
@@ -480,10 +510,10 @@ class GameScene extends Phaser.Scene {
     });
     
     // Labels
-    const hungerLabel = this.add.text(310, 48, "Hunger:", { font: "14px Arial", fill: "#ffffff" });
-    const energyLabel = this.add.text(310, 68, "Energy:", { font: "14px Arial", fill: "#ffffff" });
-    const hygieneLabel = this.add.text(310, 88, "Hygiene:", { font: "14px Arial", fill: "#ffffff" });
-    const happinessLabel = this.add.text(310, 108, "Happiness:", { font: "14px Arial", fill: "#ffffff" });
+    const hungerLabel = this.add.text(GAME_SIZE.width - 220, 48, "Hunger:", { font: "14px Arial", fill: "#ffffff" });
+    const energyLabel = this.add.text(GAME_SIZE.width - 220, 68, "Energy:", { font: "14px Arial", fill: "#ffffff" });
+    const hygieneLabel = this.add.text(GAME_SIZE.width - 220, 88, "Hygiene:", { font: "14px Arial", fill: "#ffffff" });
+    const happinessLabel = this.add.text(GAME_SIZE.width - 220, 108, "Happiness:", { font: "14px Arial", fill: "#ffffff" });
     
     // Add to UI container so they stay fixed to the camera
     this.uiContainer.add([hungerLabel, energyLabel, hygieneLabel, happinessLabel]);
@@ -602,7 +632,7 @@ class GameScene extends Phaser.Scene {
   
   setupTimers() {
     // Game time update timer (every 100ms = 10 game minutes)
-    this.time.addEvent({
+    this.gameTimeEvent = this.time.addEvent({
       delay: 100,
       callback: this.updateGameTime,
       callbackScope: this,
@@ -610,7 +640,7 @@ class GameScene extends Phaser.Scene {
     });
     
     // Stats update timer (every 5 seconds)
-    this.time.addEvent({
+    this.statsUpdateEvent = this.time.addEvent({
       delay: 5000,
       callback: this.updateStats,
       callbackScope: this,
@@ -641,7 +671,8 @@ class GameScene extends Phaser.Scene {
   }
 
   updateGameTime() {
-    this.gameTimeMinutes++;
+    // Apply time multiplier to make time pass faster or slower
+    this.gameTimeMinutes += timeMultiplier;
   
     // Check for day rollover (24 hours passed)
     if (this.gameTimeMinutes >= 1440) {
@@ -670,7 +701,7 @@ class GameScene extends Phaser.Scene {
     // Update text labels if they exist
     if (this.greetingLabel && this.timeLabel) {
       this.greetingLabel.setText(this.greetingText);
-      this.timeLabel.setText(`${this.currentWeekDay} | Day ${this.gameDay} | ${timeText}`);
+      this.timeLabel.setText(`${this.currentWeekDay} | Day ${this.gameDay} | ${timeText}${showDevTools ? ` (${timeMultiplier}x)` : ''}`);
     }
   }  
 
@@ -713,7 +744,7 @@ class GameScene extends Phaser.Scene {
     for (let i = 0; i < bars.length; i++) {
       if (this.progressBars[bars[i]]) {
         this.progressBars[bars[i]].fillStyle(colors[i], 1);
-        this.progressBars[bars[i]].fillRect(400, 50 + i * 20, stats[i], 10);
+        this.progressBars[bars[i]].fillRect(GAME_SIZE.width - 140, 50 + i * 20, stats[i], 10);
       }
     }
   }  
@@ -736,6 +767,26 @@ class GameScene extends Phaser.Scene {
     // Skip movement if name input is active or during transitions
     if (isNameInputActive || isTransitioning) {
       return;
+    }
+
+    // Update timer delays based on time multiplier
+    if (this.gameTimeEvent && this.gameTimeEvent.delay !== 100 / timeMultiplier) {
+      this.gameTimeEvent.reset({
+        delay: 100 / timeMultiplier,
+        callback: this.updateGameTime,
+        callbackScope: this,
+        loop: true
+      });
+    }
+    
+    // Update stats timer based on time multiplier
+    if (this.statsUpdateEvent && this.statsUpdateEvent.delay !== 5000 / timeMultiplier) {
+      this.statsUpdateEvent.reset({
+        delay: 5000 / timeMultiplier,
+        callback: this.updateStats,
+        callbackScope: this,
+        loop: true
+      });
     }
 
     this.handlePlayerMovement();
@@ -863,7 +914,7 @@ class HouseScene extends Phaser.Scene {
     isTransitioning = false;
     
     // Create a house floor
-    const floorTile = this.add.rectangle(0, 0, 500, 500, 0xc2a37c);
+    const floorTile = this.add.rectangle(0, 0, GAME_SIZE.width, GAME_SIZE.height, 0xc2a37c);
     floorTile.setOrigin(0, 0);
     
     // Add walls
@@ -877,7 +928,7 @@ class HouseScene extends Phaser.Scene {
     
     // Setup camera
     this.cameras.main.startFollow(this.player);
-    this.cameras.main.setBounds(0, 0, 500, 500);
+    this.cameras.main.setBounds(0, 0, GAME_SIZE.width, GAME_SIZE.height);
     
     // Setup controls
     this.setupControls();
@@ -887,7 +938,7 @@ class HouseScene extends Phaser.Scene {
     
     // Add greeting text
     const houseGreeting = this.add.text(
-      250, 30, 
+      GAME_SIZE.width/2, 30, 
       `Welcome home, ${playerName}!`, 
       { font: "20px Arial", fill: "#000000" }
     );
@@ -906,13 +957,13 @@ class HouseScene extends Phaser.Scene {
     const walls = this.physics.add.staticGroup();
     
     // Top wall
-    walls.add(this.add.rectangle(0, 0, 500, 20, 0x8c6d46));
+    walls.add(this.add.rectangle(0, 0, GAME_SIZE.width, 20, 0x8c6d46));
     // Bottom wall
-    walls.add(this.add.rectangle(0, 480, 500, 20, 0x8c6d46));
+    walls.add(this.add.rectangle(0, GAME_SIZE.height - 20, GAME_SIZE.width, 20, 0x8c6d46));
     // Left wall
-    walls.add(this.add.rectangle(0, 0, 20, 500, 0x8c6d46));
+    walls.add(this.add.rectangle(0, 0, 20, GAME_SIZE.height, 0x8c6d46));
     // Right wall
-    walls.add(this.add.rectangle(480, 0, 20, 500, 0x8c6d46));
+    walls.add(this.add.rectangle(GAME_SIZE.width - 20, 0, 20, GAME_SIZE.height, 0x8c6d46));
     
     // Set wall origins
     walls.getChildren().forEach(wall => {
@@ -956,7 +1007,7 @@ class HouseScene extends Phaser.Scene {
   
   createExitDoor() {
     // Create exit door at the bottom of the house
-    this.exitDoor = this.physics.add.sprite(250, 460, 'player');
+    this.exitDoor = this.physics.add.sprite(GAME_SIZE.width / 2, GAME_SIZE.height - 40, 'player');
     this.exitDoor.setScale(2);
     this.exitDoor.setTint(0x964B00);
     this.exitDoor.setImmovable(true);
@@ -979,7 +1030,7 @@ class HouseScene extends Phaser.Scene {
     
     // Add door text and make it more visible
     const doorText = this.add.text(
-      250, 430, 
+      GAME_SIZE.width / 2, GAME_SIZE.height - 70, 
       "Exit", 
       { font: "18px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 4 }
     );
@@ -987,7 +1038,7 @@ class HouseScene extends Phaser.Scene {
     
     // Add a visual indicator for the door
     const doorArrow = this.add.text(
-      250, 415,
+      GAME_SIZE.width / 2, GAME_SIZE.height - 85,
       "⬇️",
       { font: "16px Arial" }
     );
@@ -997,14 +1048,19 @@ class HouseScene extends Phaser.Scene {
   createFurniture() {
     // Add some basic furniture
     // Bed
-    const bed = this.add.rectangle(400, 100, 80, 120, 0x6d9eeb);
+    const bed = this.add.rectangle(GAME_SIZE.width * 0.8, GAME_SIZE.height * 0.2, 120, 180, 0x6d9eeb);
     // Table
-    const table = this.add.rectangle(150, 200, 100, 60, 0xa52a2a);
+    const table = this.add.rectangle(GAME_SIZE.width * 0.3, GAME_SIZE.height * 0.4, 150, 80, 0xa52a2a);
     // Chair
-    const chair = this.add.rectangle(150, 270, 40, 40, 0xa52a2a);
+    const chair = this.add.rectangle(GAME_SIZE.width * 0.3, GAME_SIZE.height * 0.5, 60, 60, 0xa52a2a);
+    
+    // Add more furniture for the larger space
+    const sofa = this.add.rectangle(GAME_SIZE.width * 0.6, GAME_SIZE.height * 0.6, 200, 70, 0x964B00);
+    const tv = this.add.rectangle(GAME_SIZE.width * 0.6, GAME_SIZE.height * 0.3, 120, 20, 0x333333);
+    const bookshelf = this.add.rectangle(GAME_SIZE.width * 0.15, GAME_SIZE.height * 0.2, 40, 120, 0x8B4513);
     
     // Make furniture collidable
-    [bed, table, chair].forEach(item => {
+    [bed, table, chair, sofa, tv, bookshelf].forEach(item => {
       this.physics.add.existing(item, true);
       this.physics.add.collider(this.player, item);
     });
@@ -1261,6 +1317,42 @@ function createSettingsMenu() {
   volumeDiv.appendChild(volumeSlider);
   volumeDiv.appendChild(volumeValue);
   
+  // Developer tools section
+  const devToolsDiv = document.createElement('div');
+  devToolsDiv.style.marginBottom = '15px';
+  
+  const devToolsLabel = document.createElement('label');
+  devToolsLabel.textContent = 'Developer Tools: ';
+  devToolsLabel.style.marginRight = '10px';
+  
+  const devToolsToggle = document.createElement('button');
+  devToolsToggle.textContent = 'Toggle';
+  devToolsToggle.style.padding = '5px 10px';
+  devToolsToggle.style.backgroundColor = '#ff9800';
+  devToolsToggle.style.border = 'none';
+  devToolsToggle.style.borderRadius = '5px';
+  devToolsToggle.style.cursor = 'pointer';
+  
+  devToolsToggle.addEventListener('click', () => {
+    showDevTools = !showDevTools;
+    updateDevToolsDisplay();
+    devToolsStatus.textContent = showDevTools ? 'ON' : 'OFF';
+  });
+  
+  const devToolsStatus = document.createElement('span');
+  devToolsStatus.style.marginLeft = '10px';
+  devToolsStatus.textContent = showDevTools ? 'ON' : 'OFF';
+  
+  const devToolsInfo = document.createElement('div');
+  devToolsInfo.style.fontSize = '12px';
+  devToolsInfo.style.marginTop = '5px';
+  devToolsInfo.innerHTML = 'Use ` (backtick) to toggle dev tools<br>+ / - to adjust time speed<br>0 to reset time speed';
+  
+  devToolsDiv.appendChild(devToolsLabel);
+  devToolsDiv.appendChild(devToolsToggle);
+  devToolsDiv.appendChild(devToolsStatus);
+  devToolsDiv.appendChild(devToolsInfo);
+  
   // Resume button
   const resumeButton = document.createElement('button');
   resumeButton.textContent = 'Resume Game';
@@ -1307,6 +1399,7 @@ function createSettingsMenu() {
   // Add all elements to settings menu
   settingsMenu.appendChild(minimapDiv);
   settingsMenu.appendChild(volumeDiv);
+  settingsMenu.appendChild(devToolsDiv);
   settingsMenu.appendChild(resumeButton);
   settingsMenu.appendChild(mainMenuButton);
   
@@ -1332,5 +1425,42 @@ function hideSettingsMenu() {
   const settingsMenu = document.getElementById('settingsMenu');
   if (settingsMenu) {
     settingsMenu.style.display = 'none';
+  }
+}
+
+// Function to update dev tools display
+function updateDevToolsDisplay() {
+  let devToolsElement = document.getElementById('devTools');
+  
+  // Create dev tools display if it doesn't exist
+  if (!devToolsElement) {
+    devToolsElement = document.createElement('div');
+    devToolsElement.id = 'devTools';
+    devToolsElement.style.position = 'absolute';
+    devToolsElement.style.top = '10px';
+    devToolsElement.style.right = '10px';
+    devToolsElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    devToolsElement.style.color = '#fff';
+    devToolsElement.style.padding = '10px';
+    devToolsElement.style.borderRadius = '5px';
+    devToolsElement.style.fontFamily = 'monospace';
+    devToolsElement.style.fontSize = '14px';
+    devToolsElement.style.zIndex = '2000';
+    document.body.appendChild(devToolsElement);
+  }
+  
+  // Update visibility
+  devToolsElement.style.display = showDevTools ? 'block' : 'none';
+  
+  // Update content if visible
+  if (showDevTools) {
+    devToolsElement.innerHTML = `
+      <div>DEVELOPER TOOLS</div>
+      <div>Time Speed: ${timeMultiplier}x</div>
+      <div>Controls:</div>
+      <div>+ : Speed up time</div>
+      <div>- : Slow down time</div>
+      <div>0 : Reset time speed</div>
+    `;
   }
 }
