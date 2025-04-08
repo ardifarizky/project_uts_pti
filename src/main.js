@@ -96,7 +96,6 @@ class GameScene extends Phaser.Scene {
     
     // Input controls
     this.cursor = null;
-    this.wasd = null;
     
     // Game state
     this.isGameOver = false;
@@ -434,12 +433,6 @@ class GameScene extends Phaser.Scene {
   
   setupControls() {
     this.cursor = this.input.keyboard.createCursorKeys();
-    this.wasd = this.input.keyboard.addKeys({
-      up: Phaser.Input.Keyboard.KeyCodes.W,
-      left: Phaser.Input.Keyboard.KeyCodes.A,
-      down: Phaser.Input.Keyboard.KeyCodes.S,
-      right: Phaser.Input.Keyboard.KeyCodes.D
-    });
   }
   
   setupTimers() {
@@ -585,7 +578,6 @@ class GameScene extends Phaser.Scene {
   
   handlePlayerMovement() {
     const { left, right, up, down } = this.cursor;
-    const { left: A, right: D, up: W, down: S } = this.wasd;
 
     // Reset velocity
     this.player.setVelocity(0);
@@ -595,40 +587,39 @@ class GameScene extends Phaser.Scene {
     
     // Handle diagonal movement (normalize speed)
     const isDiagonal = 
-      (left.isDown || A.isDown || right.isDown || D.isDown) && 
-      (up.isDown || W.isDown || down.isDown || S.isDown);
+      (left.isDown || right.isDown) && 
+      (up.isDown || down.isDown);
     
     if (isDiagonal) {
       speed = speed * 0.7071; // Approximately 1/sqrt(2)
     }
 
     // Handle horizontal movement
-    if (left.isDown || A.isDown) {
+    if (left.isDown) {
       this.player.setVelocityX(-speed);
       this.player.setFlipX(true);
-      if (!(up.isDown || W.isDown || down.isDown || S.isDown)) {
+      if (!(up.isDown || down.isDown)) {
         this.player.anims.play('walk-right', true);
       }
-    } else if (right.isDown || D.isDown) {
+    } else if (right.isDown) {
       this.player.setVelocityX(speed);
       this.player.setFlipX(false);
-      if (!(up.isDown || W.isDown || down.isDown || S.isDown)) {
+      if (!(up.isDown || down.isDown)) {
         this.player.anims.play('walk-right', true);
       }
     }
 
     // Handle vertical movement
-    if (up.isDown || W.isDown) {
+    if (up.isDown) {
       this.player.setVelocityY(-speed);
       this.player.anims.play('walk-up', true);
-    } else if (down.isDown || S.isDown) {
+    } else if (down.isDown) {
       this.player.setVelocityY(speed);
       this.player.anims.play('walk-down', true);
     }
     
     // If no movement keys are pressed, stop animations
-    if (!(left.isDown || A.isDown || right.isDown || D.isDown || 
-          up.isDown || W.isDown || down.isDown || S.isDown)) {
+    if (!(left.isDown || right.isDown || up.isDown || down.isDown)) {
       this.player.anims.stop();
     }
   }
@@ -696,7 +687,6 @@ class HouseScene extends Phaser.Scene {
     
     // Input controls
     this.cursor = null;
-    this.wasd = null;
     
     // Game state
     this.isGameOver = false;
@@ -851,12 +841,6 @@ class HouseScene extends Phaser.Scene {
   
   setupControls() {
     this.cursor = this.input.keyboard.createCursorKeys();
-    this.wasd = this.input.keyboard.addKeys({
-      up: Phaser.Input.Keyboard.KeyCodes.W,
-      left: Phaser.Input.Keyboard.KeyCodes.A,
-      down: Phaser.Input.Keyboard.KeyCodes.S,
-      right: Phaser.Input.Keyboard.KeyCodes.D
-    });
   }
   
   exitHouse() {
@@ -927,7 +911,6 @@ class HouseScene extends Phaser.Scene {
   
   handlePlayerMovement() {
     const { left, right, up, down } = this.cursor;
-    const { left: A, right: D, up: W, down: S } = this.wasd;
 
     // Reset velocity
     this.player.setVelocity(0);
@@ -937,40 +920,39 @@ class HouseScene extends Phaser.Scene {
     
     // Handle diagonal movement (normalize speed)
     const isDiagonal = 
-      (left.isDown || A.isDown || right.isDown || D.isDown) && 
-      (up.isDown || W.isDown || down.isDown || S.isDown);
+      (left.isDown || right.isDown) && 
+      (up.isDown || down.isDown);
     
     if (isDiagonal) {
       speed = speed * 0.7071; // Approximately 1/sqrt(2)
     }
 
     // Handle horizontal movement
-    if (left.isDown || A.isDown) {
+    if (left.isDown) {
       this.player.setVelocityX(-speed);
       this.player.setFlipX(true);
-      if (!(up.isDown || W.isDown || down.isDown || S.isDown)) {
+      if (!(up.isDown || down.isDown)) {
         this.player.anims.play('walk-right', true);
       }
-    } else if (right.isDown || D.isDown) {
+    } else if (right.isDown) {
       this.player.setVelocityX(speed);
       this.player.setFlipX(false);
-      if (!(up.isDown || W.isDown || down.isDown || S.isDown)) {
+      if (!(up.isDown || down.isDown)) {
         this.player.anims.play('walk-right', true);
       }
     }
 
     // Handle vertical movement
-    if (up.isDown || W.isDown) {
+    if (up.isDown) {
       this.player.setVelocityY(-speed);
       this.player.anims.play('walk-up', true);
-    } else if (down.isDown || S.isDown) {
+    } else if (down.isDown) {
       this.player.setVelocityY(speed);
       this.player.anims.play('walk-down', true);
     }
     
     // If no movement keys are pressed, stop animations
-    if (!(left.isDown || A.isDown || right.isDown || D.isDown || 
-          up.isDown || W.isDown || down.isDown || S.isDown)) {
+    if (!(left.isDown || right.isDown || up.isDown || down.isDown)) {
       this.player.anims.stop();
     }
   }
