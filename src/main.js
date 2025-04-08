@@ -11,6 +11,7 @@ let isTransitioning = false; // New flag to disable movement during transitions
 let game; // Define game variable outside so we can access it later
 let lastPlayerPos = { x: 100, y: 100 };
 let lastHousePos = { x: 250, y: 250 }; // Center of house, away from exit door
+let minimapVisible = true; // Add tracking variable for minimap visibility
 
 // Game constants
 const GAME_SIZE = {
@@ -83,6 +84,34 @@ document.addEventListener('DOMContentLoaded', function() {
 
   document.getElementById('playerName').addEventListener('blur', () => {
     isNameInputActive = false;
+  });
+
+  // ===================== MINIMAP TOGGLE HANDLER =====================
+  // Add global document-level event listener for M key
+  document.addEventListener('keydown', (event) => {
+    if (event.key.toLowerCase() === 'm') {
+      // Only toggle minimap if name input is not active
+      if (!isNameInputActive && game && game.scene.scenes) {
+        // Find the active GameScene instance
+        const gameScene = game.scene.scenes.find(scene => scene.scene.key === 'scene-game' && scene.scene.isActive());
+        if (gameScene) {
+          // Toggle minimap visibility
+          minimapVisible = !minimapVisible;
+          
+          if (gameScene.minimapCamera) {
+            gameScene.minimapCamera.visible = minimapVisible;
+          }
+          
+          if (gameScene.minimapBorder) {
+            gameScene.minimapBorder.visible = minimapVisible;
+          }
+          
+          if (gameScene.minimapText) {
+            gameScene.minimapText.visible = minimapVisible;
+          }
+        }
+      }
+    }
   });
 
   // ===================== CHARACTER SELECTION HANDLER =====================
@@ -522,11 +551,21 @@ class GameScene extends Phaser.Scene {
     }
     
     // Create border around minimap
-    const border = this.add.graphics();
-    border.lineStyle(2, 0xffffff, 1);
-    border.strokeRect(minimapX, minimapY, minimapWidth, minimapHeight);
-    border.setScrollFactor(0);
-    border.setDepth(90); // Below UI but above other elements
+    this.minimapBorder = this.add.graphics();
+    this.minimapBorder.lineStyle(2, 0xffffff, 1);
+    this.minimapBorder.strokeRect(minimapX, minimapY, minimapWidth, minimapHeight);
+    this.minimapBorder.setScrollFactor(0);
+    this.minimapBorder.setDepth(90); // Below UI but above other elements
+    
+    // Add text instruction for minimap toggle
+    this.minimapText = this.add.text(
+      minimapX + 5, 
+      minimapY + minimapHeight - 20, 
+      "Press M to toggle", 
+      { font: "10px Arial", fill: "#ffffff" }
+    );
+    this.minimapText.setScrollFactor(0);
+    this.minimapText.setDepth(91);
   }
   
   setupControls() {
