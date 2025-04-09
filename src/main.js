@@ -1,16 +1,22 @@
 // Import statements first
 import './style.css';
 import Phaser from 'phaser';
+import Beach from './Beach.js';
+import Player, { CHARACTER_SPRITES } from './object/Player.js';
+import HouseScene from './scenes/HouseScene.js';
+import TutorialScene from './scenes/TutorialScene.js';
 
 // ===================== GLOBAL VARIABLES & SETUP =====================
-let playerName = "";
+let playerName = "Ucup"; // Default player name changed to "Ucup"
 let selectedCharacter = "ucup"; // Default character
 let isNameInputActive = true; // Default to true since name input starts active
 let isLoadingHouse = false;
+let isLoadingBeach = false; // New flag for beach transition
 let isTransitioning = false; // New flag to disable movement during transitions
 let game; // Define game variable outside so we can access it later
 let lastPlayerPos = { x: 100, y: 100 };
 let lastHousePos = { x: 250, y: 250 }; // Center of house, away from exit door
+let lastBeachPos = { x: 480, y: 450 }; // Default beach position
 let minimapVisible = true; // Add tracking variable for minimap visibility
 let isSettingsMenuOpen = false; // Track if settings menu is open
 let timeMultiplier = 1; // Time multiplier for developer tools
@@ -25,43 +31,8 @@ const WORLD_SIZE = {
   width: 1600,
   height: 1600
 };
-const SPEED_DOWN = 300;
+const SPEED_DOWN = 150;
 const PLAYER_SPEED = SPEED_DOWN + 50;
-
-// Character sprite configurations
-const CHARACTER_SPRITES = {
-  ucup: { spritesheet: 'player', scale: 2 },
-  budi: { spritesheet: 'player', scale: 2, tint: 0xadd8e6 }, // Light blue tint
-  doni: { spritesheet: 'player', scale: 2, tint: 0xffa500 }  // Orange tint
-};
-
-// Function to extract front-facing sprite from spritesheet
-function extractFrontSprite(imageUrl, callback) {
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.onload = function() {
-    // Create canvas with padding for better centering
-    const canvas = document.createElement('canvas');
-    // Increase canvas size for higher quality
-    canvas.width = 32;
-    canvas.height = 32;
-    const ctx = canvas.getContext('2d');
-    
-    // Clear canvas with transparent background
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Extract the front-facing sprite (frame 1 - more centered facing front)
-    // The spritesheet has 6 frames per row, frames 0-5 are walking down animations
-    // Frame 1 is a good centered front-facing pose
-    ctx.drawImage(img, 32 * 1, 0, 32, 32, 0, 0, 32, 32);
-    
-    // Create a new image with the extracted sprite
-    const frontSprite = new Image();
-    frontSprite.src = canvas.toDataURL('image/png');
-    callback(frontSprite);
-  };
-  img.src = imageUrl;
-}
 
 // Wait for DOM to be fully loaded before accessing elements
 document.addEventListener('DOMContentLoaded', function() {
@@ -71,9 +42,13 @@ document.addEventListener('DOMContentLoaded', function() {
   const gameCanvas = document.getElementById("gameCanvas");
   const characterSelect = document.getElementById("characterSelect");
   const characterCards = document.querySelectorAll(".character-card");
+  
+  // Set default value for player name input
+  const playerNameInput = document.getElementById('playerName');
+  playerNameInput.value = "Ucup";
 
   // Extract and set front-facing sprites for character selection
-  extractFrontSprite('/assets/Player/Player.png', (frontSprite) => {
+  Player.extractFrontSprite('/assets/Player/Player.png', (frontSprite) => {
     characterCards.forEach(card => {
       const img = card.querySelector('.character-img');
       img.src = frontSprite.src;
@@ -112,6 +87,28 @@ document.addEventListener('DOMContentLoaded', function() {
           if (gameScene.minimapText) {
             gameScene.minimapText.visible = minimapVisible;
           }
+        }
+      }
+    }
+    
+    // Tutorial toggle with H key
+    if (event.key.toLowerCase() === 'h') {
+      // Only toggle tutorial if name input is not active and game has started
+      if (!isNameInputActive && game && game.scene.scenes) {
+        // Find the tutorial scene
+        const tutorialScene = game.scene.scenes.find(scene => scene.scene.key === 'scene-tutorial');
+        
+        if (tutorialScene) {
+          // Make sure the tutorial scene is started if it's the first time
+          if (!tutorialScene.scene.isActive()) {
+            tutorialScene.scene.start();
+            tutorialScene.scene.bringToTop();
+          } else {
+            tutorialScene.scene.bringToTop();
+          }
+          
+          // Simply ensure the scene is started and on top
+          // The scene itself will handle toggling visibility
         }
       }
     }
@@ -221,20 +218,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const inputName = document.getElementById('playerName').value.trim();
 
     if (!inputName) {
-      alert("Please enter your name!");
+      // Use default name "Ucup" instead of showing alert
+      playerName = "Ucup";
+      console.log(`Using default player name: ${playerName}`);
     } else {
       playerName = inputName;
       console.log(`Player's name: ${playerName}`);
-      console.log(`Selected character: ${selectedCharacter}`);
-      gameStartDiv.style.display = "none";
-      
-      // Delay to ensure UI updates before resuming game
-      setTimeout(() => {
-        isNameInputActive = false;
-        console.log("isNameInputActive set to false");
-        game.scene.resume("scene-game");
-      }, 100);
     }
+    
+    console.log(`Selected character: ${selectedCharacter}`);
+    gameStartDiv.style.display = "none";
+    
+    // Delay to ensure UI updates before resuming game
+    setTimeout(() => {
+      isNameInputActive = false;
+      console.log("isNameInputActive set to false");
+      game.scene.resume("scene-game");
+    }, 100);
   });
 
   // ===================== RESTART BUTTON HANDLER =====================
@@ -248,6 +248,9 @@ document.addEventListener('DOMContentLoaded', function() {
     width: GAME_SIZE.width,
     height: GAME_SIZE.height,
     canvas: gameCanvas,
+    pixelArt: true, // Enable pixel art mode
+    roundPixels: true, // Prevent subpixel rendering
+    antialias: false, // Disable antialiasing for sharp pixels
     physics: {
       default: "arcade",
       arcade: {
@@ -257,7 +260,7 @@ document.addEventListener('DOMContentLoaded', function() {
         tileBias: 32
       }
     },
-    scene: [GameScene, HouseScene]
+    scene: [GameScene, HouseScene, Beach, TutorialScene]
   };
 
   // Initialize the game
@@ -303,6 +306,13 @@ class GameScene extends Phaser.Scene {
     this.progressBars = null;
   }
   
+  // Add init method to receive data from HouseScene
+  init(data) {
+    if (data && data.lastHousePos) {
+      lastHousePos = data.lastHousePos;
+    }
+  }
+
   initializeGameTime() {
     const now = new Date();
     this.gameTimeMinutes = now.getHours() * 60 + now.getMinutes();
@@ -334,6 +344,11 @@ class GameScene extends Phaser.Scene {
     // Only pause if this is the initial game load
     if (isNameInputActive) {
       this.scene.pause("scene-game");
+    }
+    
+    // Start the tutorial scene but keep it hidden
+    if (!this.scene.isActive('scene-tutorial')) {
+      this.scene.launch('scene-tutorial');
     }
     
     // Create UI container first (but add elements later)
@@ -448,6 +463,37 @@ class GameScene extends Phaser.Scene {
         house.height * 0.4
       );
     });
+    
+    // Create beach entrance area
+    this.createBeachEntrance();
+  }
+  
+  createBeachEntrance() {
+    // Create a beach entrance area
+    const beachEntrancePos = { x: 600, y: 400 };
+    this.beachEntrance = this.physics.add.sprite(beachEntrancePos.x, beachEntrancePos.y, 'player');
+    this.beachEntrance.setScale(3);
+    this.beachEntrance.setTint(0xf7e26b); // Sand color
+    this.beachEntrance.setAlpha(0.7);
+    this.beachEntrance.setImmovable(true);
+    this.beachEntrance.body.allowGravity = false;
+    
+    // Add beach sign
+    const beachSign = this.add.text(
+      beachEntrancePos.x, beachEntrancePos.y - 30, 
+      "→ BEACH →", 
+      { font: "bold 16px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 3 }
+    );
+    beachSign.setOrigin(0.5, 0.5);
+    
+    // Add interaction with beach entrance
+    this.physics.add.overlap(
+      this.player, 
+      this.beachEntrance, 
+      this.enterBeach, 
+      this.canEnterBeach, 
+      this
+    );
   }
   
   createHouse() {
@@ -524,55 +570,11 @@ class GameScene extends Phaser.Scene {
   }
   
   createPlayer() {
-    // Create player animations
-    this.createPlayerAnimations();
+    // Create player using the new Player class
+    this.player = new Player(this, lastPlayerPos.x, lastPlayerPos.y, selectedCharacter);
     
-    // Create player sprite - use the saved position if returning from house
-    this.player = this.physics.add.sprite(lastPlayerPos.x, lastPlayerPos.y, 'player');
-    this.player.setScale(CHARACTER_SPRITES[selectedCharacter].scale);
-    
-    // Apply character tint if specified
-    if (CHARACTER_SPRITES[selectedCharacter].tint) {
-      this.player.setTint(CHARACTER_SPRITES[selectedCharacter].tint);
-    }
-    
-    this.player.setImmovable(false);
-    this.player.body.allowGravity = false;
-    this.player.setCollideWorldBounds(true);
-    this.player.setDepth(3);
-    
-    // Adjust player collision box
-    this.player.body.setSize(
-      this.player.width * 0.6, 
-      this.player.height * 0.5
-    );
-    this.player.body.setOffset(
-      this.player.width * 0.2, 
-      this.player.height * 0.5
-    );
-  }
-  
-  createPlayerAnimations() {
-    this.anims.create({
-      key: 'walk-right',
-      frames: this.anims.generateFrameNumbers('player', { start: 6, end: 11 }),
-      frameRate: 60,
-      repeat: -1
-    });
-    
-    this.anims.create({
-      key: 'walk-up',
-      frames: this.anims.generateFrameNumbers('player', { start: 12, end: 17 }),
-      frameRate: 60,
-      repeat: -1
-    });
-    
-    this.anims.create({
-      key: 'walk-down',
-      frames: this.anims.generateFrameNumbers('player', { start: 0, end: 5 }),
-      frameRate: 60,
-      repeat: -1
-    });
+    // Configure any additional scene-specific settings
+    this.player.playerSpeed = PLAYER_SPEED;
   }
   
   setupCamera() {
@@ -627,7 +629,7 @@ class GameScene extends Phaser.Scene {
   }
   
   setupControls() {
-    this.cursor = this.input.keyboard.createCursorKeys();
+    // No need to create cursor keys here as Player class handles its own input
   }
   
   setupTimers() {
@@ -789,54 +791,9 @@ class GameScene extends Phaser.Scene {
       });
     }
 
-    this.handlePlayerMovement();
-  }
-  
-  handlePlayerMovement() {
-    const { left, right, up, down } = this.cursor;
-
-    // Reset velocity
-    this.player.setVelocity(0);
-
-    // Calculate movement speed
-    let speed = this.playerSpeed;
-    
-    // Handle diagonal movement (normalize speed)
-    const isDiagonal = 
-      (left.isDown || right.isDown) && 
-      (up.isDown || down.isDown);
-    
-    if (isDiagonal) {
-      speed = speed * 0.7071; // Approximately 1/sqrt(2)
-    }
-
-    // Handle horizontal movement
-    if (left.isDown) {
-      this.player.setVelocityX(-speed);
-      this.player.setFlipX(true);
-      if (!(up.isDown || down.isDown)) {
-        this.player.anims.play('walk-right', true);
-      }
-    } else if (right.isDown) {
-      this.player.setVelocityX(speed);
-      this.player.setFlipX(false);
-      if (!(up.isDown || down.isDown)) {
-        this.player.anims.play('walk-right', true);
-      }
-    }
-
-    // Handle vertical movement
-    if (up.isDown) {
-      this.player.setVelocityY(-speed);
-      this.player.anims.play('walk-up', true);
-    } else if (down.isDown) {
-      this.player.setVelocityY(speed);
-      this.player.anims.play('walk-down', true);
-    }
-    
-    // If no movement keys are pressed, stop animations
-    if (!(left.isDown || right.isDown || up.isDown || down.isDown)) {
-      this.player.anims.stop();
+    // Update player if it exists
+    if (this.player) {
+      this.player.update();
     }
   }
 
@@ -860,9 +817,8 @@ class GameScene extends Phaser.Scene {
     isLoadingHouse = true;
     isTransitioning = true;
     
-    // Stop player movement immediately
-    this.player.setVelocity(0);
-    this.player.anims.stop();
+    // Stop player movement
+    this.player.stopMovement();
     
     // Create a loading screen overlay
     const loadingScreen = this.add.rectangle(
@@ -887,207 +843,35 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(1500, () => {
       isLoadingHouse = false;
       // Keep isTransitioning true until the house scene has fully loaded
-      this.scene.start("scene-house");
+      this.scene.start("scene-house", {
+        isTransitioning: isTransitioning,
+        lastHousePos: lastHousePos,
+        playerName: playerName,
+        selectedCharacter: selectedCharacter,
+        PLAYER_SPEED: PLAYER_SPEED,
+        GAME_SIZE: GAME_SIZE
+      });
     });
   }
-}
 
-// ===================== HOUSE SCENE CLASS =====================
-class HouseScene extends Phaser.Scene {
-  constructor() {
-    super("scene-house");
+  // Add beach entrance method
+  enterBeach() {
+    if (isLoadingBeach || isTransitioning) return;
     
-    // Player properties
-    this.player = null;
-    this.playerSpeed = PLAYER_SPEED;
+    // Store current player position before entering beach
+    lastPlayerPos = { 
+      x: this.player.x, 
+      y: this.player.y
+    };
     
-    // Input controls
-    this.cursor = null;
-    
-    // Game state
-    this.isGameOver = false;
-    this.exitDoor = null;
-  }
-  
-  create() {
-    // Reset transition flag when house scene is created
-    isTransitioning = false;
-    
-    // Create a house floor
-    const floorTile = this.add.rectangle(0, 0, GAME_SIZE.width, GAME_SIZE.height, 0xc2a37c);
-    floorTile.setOrigin(0, 0);
-    
-    // Add walls
-    this.createWalls();
-    
-    // Create player
-    this.createPlayer();
-    
-    // Create exit door
-    this.createExitDoor();
-    
-    // Setup camera
-    this.cameras.main.startFollow(this.player);
-    this.cameras.main.setBounds(0, 0, GAME_SIZE.width, GAME_SIZE.height);
-    
-    // Setup controls
-    this.setupControls();
-    
-    // Add furniture and decorations
-    this.createFurniture();
-    
-    // Add greeting text
-    const houseGreeting = this.add.text(
-      GAME_SIZE.width/2, 30, 
-      `Welcome home, ${playerName}!`, 
-      { font: "20px Arial", fill: "#000000" }
-    );
-    houseGreeting.setOrigin(0.5, 0);
-    houseGreeting.setScrollFactor(0);
-    
-    // Add a brief delay before exit is active to prevent immediate exit
-    this.exitActive = false;
-    this.time.delayedCall(1000, () => {
-      this.exitActive = true;
-    });
-  }
-  
-  createWalls() {
-    // Create wall graphics
-    const walls = this.physics.add.staticGroup();
-    
-    // Top wall
-    walls.add(this.add.rectangle(0, 0, GAME_SIZE.width, 20, 0x8c6d46));
-    // Bottom wall
-    walls.add(this.add.rectangle(0, GAME_SIZE.height - 20, GAME_SIZE.width, 20, 0x8c6d46));
-    // Left wall
-    walls.add(this.add.rectangle(0, 0, 20, GAME_SIZE.height, 0x8c6d46));
-    // Right wall
-    walls.add(this.add.rectangle(GAME_SIZE.width - 20, 0, 20, GAME_SIZE.height, 0x8c6d46));
-    
-    // Set wall origins
-    walls.getChildren().forEach(wall => {
-      wall.setOrigin(0, 0);
-    });
-    
-    this.walls = walls;
-  }
-  
-  createPlayer() {
-    // Create player sprite - use saved position or default
-    // Move player spawn position away from the exit door
-    this.player = this.physics.add.sprite(
-      lastHousePos.x, 
-      Math.min(lastHousePos.y, 350), // Ensure player doesn't spawn below y=350 to stay away from exit
-      'player'
-    );
-    this.player.setScale(CHARACTER_SPRITES[selectedCharacter].scale);
-    
-    // Apply character tint if specified
-    if (CHARACTER_SPRITES[selectedCharacter].tint) {
-      this.player.setTint(CHARACTER_SPRITES[selectedCharacter].tint);
-    }
-    
-    this.player.body.allowGravity = false;
-    this.player.setCollideWorldBounds(true);
-    
-    // Add collision with walls
-    this.physics.add.collider(this.player, this.walls);
-    
-    // Adjust player collision box
-    this.player.body.setSize(
-      this.player.width * 0.6, 
-      this.player.height * 0.5
-    );
-    this.player.body.setOffset(
-      this.player.width * 0.2, 
-      this.player.height * 0.5
-    );
-  }
-  
-  createExitDoor() {
-    // Create exit door at the bottom of the house
-    this.exitDoor = this.physics.add.sprite(GAME_SIZE.width / 2, GAME_SIZE.height - 40, 'player');
-    this.exitDoor.setScale(2);
-    this.exitDoor.setTint(0x964B00);
-    this.exitDoor.setImmovable(true);
-    this.exitDoor.body.allowGravity = false;
-    
-    // Make the door hitbox smaller
-    this.exitDoor.body.setSize(
-      this.exitDoor.width * 0.5,
-      this.exitDoor.height * 0.5
-    );
-    
-    // Add interaction with exit door - add the canExitHouse check function
-    this.physics.add.overlap(
-      this.player, 
-      this.exitDoor, 
-      this.exitHouse, 
-      this.canExitHouse, 
-      this
-    );
-    
-    // Add door text and make it more visible
-    const doorText = this.add.text(
-      GAME_SIZE.width / 2, GAME_SIZE.height - 70, 
-      "Exit", 
-      { font: "18px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 4 }
-    );
-    doorText.setOrigin(0.5, 0);
-    
-    // Add a visual indicator for the door
-    const doorArrow = this.add.text(
-      GAME_SIZE.width / 2, GAME_SIZE.height - 85,
-      "⬇️",
-      { font: "16px Arial" }
-    );
-    doorArrow.setOrigin(0.5, 0);
-  }
-  
-  createFurniture() {
-    // Add some basic furniture
-    // Bed
-    const bed = this.add.rectangle(GAME_SIZE.width * 0.8, GAME_SIZE.height * 0.2, 120, 180, 0x6d9eeb);
-    // Table
-    const table = this.add.rectangle(GAME_SIZE.width * 0.3, GAME_SIZE.height * 0.4, 150, 80, 0xa52a2a);
-    // Chair
-    const chair = this.add.rectangle(GAME_SIZE.width * 0.3, GAME_SIZE.height * 0.5, 60, 60, 0xa52a2a);
-    
-    // Add more furniture for the larger space
-    const sofa = this.add.rectangle(GAME_SIZE.width * 0.6, GAME_SIZE.height * 0.6, 200, 70, 0x964B00);
-    const tv = this.add.rectangle(GAME_SIZE.width * 0.6, GAME_SIZE.height * 0.3, 120, 20, 0x333333);
-    const bookshelf = this.add.rectangle(GAME_SIZE.width * 0.15, GAME_SIZE.height * 0.2, 40, 120, 0x8B4513);
-    
-    // Make furniture collidable
-    [bed, table, chair, sofa, tv, bookshelf].forEach(item => {
-      this.physics.add.existing(item, true);
-      this.physics.add.collider(this.player, item);
-    });
-  }
-  
-  setupControls() {
-    this.cursor = this.input.keyboard.createCursorKeys();
-  }
-  
-  exitHouse() {
-    // Don't allow exit if not active yet or during transition
-    if (!this.exitActive || isTransitioning) return;
-    
-    // Store house position before exiting
-    lastHousePos = { x: this.player.x, y: this.player.y };
-    
-    // Set transition flag to prevent movement
+    // Set transition flags
+    isLoadingBeach = true;
     isTransitioning = true;
     
-    // Start the safety timer
-    addSafetyResetTimer();
+    // Stop player movement
+    this.player.stopMovement();
     
-    // Stop player movement immediately
-    this.player.setVelocity(0);
-    this.player.anims.stop();
-    
-    // Create a loading screen
+    // Create a loading screen overlay
     const loadingScreen = this.add.rectangle(
       0, 0, 
       GAME_SIZE.width, GAME_SIZE.height, 
@@ -1099,95 +883,24 @@ class HouseScene extends Phaser.Scene {
     
     const loadingText = this.add.text(
       GAME_SIZE.width/2, GAME_SIZE.height/2, 
-      "Exiting house...", 
+      "Going to the beach...", 
       { font: "24px Arial", fill: "#ffffff" }
     );
     loadingText.setOrigin(0.5);
     loadingText.setScrollFactor(0);
     loadingText.setDepth(1001);
     
-    // Wait a moment, then switch back to the game scene
-    this.time.delayedCall(1000, () => {
-      // Properly shut down current scene and restart the game scene
-      try {
-        // Stop all running timers
-        this.time.removeAllEvents();
-        
-        // Remove all game objects
-        this.children.removeAll(true);
-        
-        // Switch to the game scene with a restart
-        this.scene.stop('scene-house');
-        this.scene.start('scene-game');
-        
-        console.log("Transition to main game complete");
-      } catch (error) {
-        console.error("Error during scene transition:", error);
-      }
+    // Wait a moment before transitioning to beach scene
+    this.time.delayedCall(1500, () => {
+      isLoadingBeach = false;
+      // Keep isTransitioning true until the beach scene has fully loaded
+      this.scene.start("scene-beach");
     });
   }
-  
-  update() {
-    // Skip movement during transitions
-    if (isTransitioning) {
-      return;
-    }
-    
-    this.handlePlayerMovement();
-  }
-  
-  handlePlayerMovement() {
-    const { left, right, up, down } = this.cursor;
 
-    // Reset velocity
-    this.player.setVelocity(0);
-
-    // Calculate movement speed
-    let speed = this.playerSpeed;
-    
-    // Handle diagonal movement (normalize speed)
-    const isDiagonal = 
-      (left.isDown || right.isDown) && 
-      (up.isDown || down.isDown);
-    
-    if (isDiagonal) {
-      speed = speed * 0.7071; // Approximately 1/sqrt(2)
-    }
-
-    // Handle horizontal movement
-    if (left.isDown) {
-      this.player.setVelocityX(-speed);
-      this.player.setFlipX(true);
-      if (!(up.isDown || down.isDown)) {
-        this.player.anims.play('walk-right', true);
-      }
-    } else if (right.isDown) {
-      this.player.setVelocityX(speed);
-      this.player.setFlipX(false);
-      if (!(up.isDown || down.isDown)) {
-        this.player.anims.play('walk-right', true);
-      }
-    }
-
-    // Handle vertical movement
-    if (up.isDown) {
-      this.player.setVelocityY(-speed);
-      this.player.anims.play('walk-up', true);
-    } else if (down.isDown) {
-      this.player.setVelocityY(speed);
-      this.player.anims.play('walk-down', true);
-    }
-    
-    // If no movement keys are pressed, stop animations
-    if (!(left.isDown || right.isDown || up.isDown || down.isDown)) {
-      this.player.anims.stop();
-    }
-  }
-
-  // Add new function to prevent exit overlap from triggering immediately
-  canExitHouse() {
-    // Only allow exit if the flag is active
-    return this.exitActive && !isTransitioning;
+  canEnterBeach() {
+    // Only allow entry if not already loading and not in transition
+    return !isLoadingBeach && !isTransitioning;
   }
 }
 
