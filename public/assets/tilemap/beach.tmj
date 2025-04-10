@@ -4,7 +4,7 @@
      "export":
         {
          "format":"json",
-         "target":"house.json"
+         "target":"beach.json"
         }
     },
  "height":100,
@@ -64,7 +64,7 @@
          "encoding":"base64",
          "height":100,
          "id":4,
-         "name":"items",
+         "name":"item",
          "opacity":1,
          "type":"tilelayer",
          "visible":true,
