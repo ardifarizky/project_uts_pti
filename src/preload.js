@@ -23,7 +23,7 @@ export default class PreloadScene extends Phaser.Scene {
     const height = this.cameras.main.height;
     
     // Create a title
-    const titleText = this.add.text(width / 2, height / 2 - 120, 'Village Life Simulator', {
+    const titleText = this.add.text(width / 2, height / 2 - 120, 'Ucup Menjelajah Nusantara', {
       font: 'bold 32px Arial',
       fill: '#ffffff',
       stroke: '#000000',
