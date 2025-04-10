@@ -16,6 +16,14 @@ class Beach extends Phaser.Scene {
         this.exitArea = null;
         this.waterArea = null;
         this.isTransitioning = false;
+        
+        // UI elements
+        this.statsContainer = null;
+        this.energyText = null;
+        this.moneyText = null;
+        this.hungerText = null;
+        this.hygieneText = null;
+        this.happinessText = null;
     }
     
     create() {
@@ -37,11 +45,101 @@ class Beach extends Phaser.Scene {
         // Display beach name
         this.createBeachName();
         
+        // Create UI for stats
+        this.createStatsUI();
+        
         // Setup camera
         this.setupCamera();
         
         // Setup controls
         this.setupControls();
+    }
+    
+    // Helper method to get playerStats from global
+    getPlayerStats() {
+        return typeof window !== 'undefined' && window.playerStats ? window.playerStats : { 
+            energy: 50, 
+            money: 100,
+            hunger: 50,
+            hygiene: 50,
+            happiness: 50
+        };
+    }
+    
+    // Helper method to update a specific stat
+    updatePlayerStat(stat, value) {
+        if (typeof window !== 'undefined' && window.playerStats) {
+            window.playerStats[stat] = value;
+        }
+    }
+    
+    createStatsUI() {
+        // Create a container for stats UI elements
+        this.statsContainer = this.add.container(10, 10);
+        this.statsContainer.setScrollFactor(0);
+        this.statsContainer.setDepth(100);
+        
+        // Get current player stats
+        const playerStats = this.getPlayerStats();
+        
+        // Create stat display texts
+        this.energyText = this.add.text(0, 0, `Energy: ${playerStats.energy}`, { 
+            font: '16px Arial', 
+            fill: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 3
+        });
+        
+        this.moneyText = this.add.text(0, 25, `Money: $${playerStats.money}`, { 
+            font: '16px Arial', 
+            fill: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 3
+        });
+        
+        this.hungerText = this.add.text(0, 50, `Hunger: ${playerStats.hunger}`, { 
+            font: '16px Arial', 
+            fill: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 3
+        });
+        
+        this.hygieneText = this.add.text(0, 75, `Hygiene: ${playerStats.hygiene}`, { 
+            font: '16px Arial', 
+            fill: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 3
+        });
+        
+        this.happinessText = this.add.text(0, 100, `Happiness: ${playerStats.happiness}`, { 
+            font: '16px Arial', 
+            fill: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 3
+        });
+        
+        // Add texts to container
+        this.statsContainer.add([
+            this.energyText,
+            this.moneyText,
+            this.hungerText,
+            this.hygieneText,
+            this.happinessText
+        ]);
+    }
+    
+    updateStatsUI() {
+        if (!this.statsContainer) return;
+        
+        // Get current player stats
+        const playerStats = this.getPlayerStats();
+        
+        // Update text displays
+        if (this.energyText) this.energyText.setText(`Energy: ${playerStats.energy}`);
+        if (this.moneyText) this.moneyText.setText(`Money: $${playerStats.money}`);
+        if (this.hungerText) this.hungerText.setText(`Hunger: ${playerStats.hunger}`);
+        if (this.hygieneText) this.hygieneText.setText(`Hygiene: ${playerStats.hygiene}`);
+        if (this.happinessText) this.happinessText.setText(`Happiness: ${playerStats.happiness}`);
     }
     
     createEnvironment() {
@@ -169,7 +267,35 @@ class Beach extends Phaser.Scene {
             this.player.playerSpeed = 150;
         }
         
-        // Could add splash particles or swimming animation here
+        // Increase hygiene when in water
+        const playerStats = this.getPlayerStats();
+        if (playerStats.hygiene < 100) {
+            // Small increase in hygiene while swimming
+            this.updatePlayerStat('hygiene', Math.min(100, playerStats.hygiene + 0.1));
+            
+            // Decrease energy slightly while swimming
+            this.updatePlayerStat('energy', Math.max(0, playerStats.energy - 0.05));
+            
+            // Show water effects
+            if (Math.random() < 0.05) {
+                // Create a splash effect occasionally
+                const splash = this.add.circle(
+                    this.player.x + (Math.random() * 30 - 15),
+                    this.player.y + (Math.random() * 30 - 15),
+                    5,
+                    0xffffff,
+                    0.7
+                );
+                // Fade out and remove
+                this.tweens.add({
+                    targets: splash,
+                    alpha: 0,
+                    scale: 2,
+                    duration: 800,
+                    onComplete: () => splash.destroy()
+                });
+            }
+        }
     }
     
     setupControls() {
@@ -191,6 +317,9 @@ class Beach extends Phaser.Scene {
         if (this.player && this.waterArea && !this.physics.overlap(this.player, this.waterArea)) {
             this.player.playerSpeed = 350;
         }
+        
+        // Update stats UI
+        this.updateStatsUI();
     }
     
     exitBeach() {

@@ -5,6 +5,7 @@ import Beach from './Beach.js';
 import Player, { CHARACTER_SPRITES } from './object/Player.js';
 import HouseScene from './scenes/HouseScene.js';
 import TutorialScene from './scenes/TutorialScene.js';
+import PreloadScene from './preload.js';
 
 // ===================== GLOBAL VARIABLES & SETUP =====================
 let playerName = "Ucup"; // Default player name changed to "Ucup"
@@ -15,12 +16,29 @@ let isLoadingBeach = false; // New flag for beach transition
 let isTransitioning = false; // New flag to disable movement during transitions
 let game; // Define game variable outside so we can access it later
 let lastPlayerPos = { x: 100, y: 100 };
-let lastHousePos = { x: 250, y: 250 }; // Center of house, away from exit door
+let lastHousePos = { x: 300, y: 200 }; // Center of house, away from exit door
 let lastBeachPos = { x: 480, y: 450 }; // Default beach position
 let minimapVisible = true; // Add tracking variable for minimap visibility
 let isSettingsMenuOpen = false; // Track if settings menu is open
 let timeMultiplier = 1; // Time multiplier for developer tools
 let showDevTools = false; // Track if dev tools are visible
+let currentGameDay = 1; // Track current game day globally
+let completedChores = {}; // Global track of completed chores
+
+// Global player stats object to maintain consistency across scenes
+let playerStats = {
+  hunger: 50,
+  energy: 50,
+  hygiene: 50,
+  happiness: 50,
+  money: 100
+};
+
+// Make global variables available to window
+if (typeof window !== 'undefined') {
+  window.completedChores = completedChores;
+  window.playerStats = playerStats;
+}
 
 // Game constants
 const GAME_SIZE = {
@@ -260,7 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
         tileBias: 32
       }
     },
-    scene: [GameScene, HouseScene, Beach, TutorialScene]
+    scene: [PreloadScene, GameScene, HouseScene, Beach, TutorialScene]
   };
 
   // Initialize the game
@@ -282,13 +300,6 @@ class GameScene extends Phaser.Scene {
     // Game state
     this.isGameOver = false;
     
-    // Character stats
-    this.hunger = 50;
-    this.energy = 50;
-    this.hygiene = 50;
-    this.happiness = 50;
-    this.money = 100;
-    
     // Game time
     this.initializeGameTime();
     
@@ -308,28 +319,50 @@ class GameScene extends Phaser.Scene {
   
   // Add init method to receive data from HouseScene
   init(data) {
+    console.log("GameScene init called with data:", data);
+    
     if (data && data.lastHousePos) {
       lastHousePos = data.lastHousePos;
+      console.log("Updated lastHousePos:", lastHousePos);
     }
+    
+    // Always load stats from global playerStats
+    this.syncStatsFromGlobal();
+  }
+
+  // New method to sync stats from global object
+  syncStatsFromGlobal() {
+    this.hunger = playerStats.hunger;
+    this.energy = playerStats.energy;
+    this.hygiene = playerStats.hygiene;
+    this.happiness = playerStats.happiness;
+    this.money = playerStats.money;
+    console.log("Synced stats from global - Energy:", this.energy, "Money:", this.money);
+  }
+
+  // New method to update global stats
+  updateGlobalStats() {
+    playerStats.hunger = this.hunger;
+    playerStats.energy = this.energy;
+    playerStats.hygiene = this.hygiene;
+    playerStats.happiness = this.happiness;
+    playerStats.money = this.money;
+    console.log("Updated global stats - Energy:", playerStats.energy, "Money:", playerStats.money);
   }
 
   initializeGameTime() {
-    const now = new Date();
-    this.gameTimeMinutes = now.getHours() * 60 + now.getMinutes();
+    // Set game time to 8:00 AM (8 hours = 480 minutes)
+    this.gameTimeMinutes = 480;
     this.gameDay = 1;
     this.weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    // Keep using current day of week for convenience
+    const now = new Date();
     this.currentWeekDay = this.weekDays[now.getDay()];
     this.greetingText = "";
   }
 
   preload() {
-    // Load assets
-    this.load.image("bg2", "/assets/bg2.png");
-    this.load.image("house", "/assets/Outdoor decoration/House.png");
-    this.load.audio("coin", "/assets/coin.mp3");
-    this.load.audio("bgMusic", "/assets/bgMusic.mp3");
-    this.load.spritesheet('player', '/assets/Player/Player.png', {frameWidth: 32, frameHeight: 32});
-    
+    // Assets are now loaded in PreloadScene
     // Set world bounds
     this.physics.world.setBounds(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
   }
@@ -350,6 +383,13 @@ class GameScene extends Phaser.Scene {
     if (!this.scene.isActive('scene-tutorial')) {
       this.scene.launch('scene-tutorial');
     }
+    
+    // Make sure any existing transition overlays are removed
+    this.children.each(child => {
+      if (child.depth >= 1000) {
+        child.destroy();
+      }
+    });
     
     // Create UI container first (but add elements later)
     this.uiContainer = this.add.container(0, 0);
@@ -439,20 +479,20 @@ class GameScene extends Phaser.Scene {
     // Store additional houses for collision
     this.additionalHouses = [];
     
-    // Add a few more houses in different locations
+    // Add a few more houses in different locations - removed scaling
     let house2 = this.physics.add.sprite(800, 800, "house");
-    house2.setScale(2);
+    // Remove scale and adjust collision box directly
     house2.setImmovable(true);
     house2.body.allowGravity = false;
     this.additionalHouses.push(house2);
     
     let house3 = this.physics.add.sprite(400, 1200, "house");
-    house3.setScale(2);
+    // Remove scale and adjust collision box directly
     house3.setImmovable(true);
     house3.body.allowGravity = false;
     this.additionalHouses.push(house3);
     
-    // Configure hitboxes similar to main house
+    // Configure hitboxes with absolute sizes instead of relative to scale
     this.additionalHouses.forEach(house => {
       house.body.setSize(
         house.width * 0.7, 
@@ -472,7 +512,9 @@ class GameScene extends Phaser.Scene {
     // Create a beach entrance area
     const beachEntrancePos = { x: 600, y: 400 };
     this.beachEntrance = this.physics.add.sprite(beachEntrancePos.x, beachEntrancePos.y, 'player');
-    this.beachEntrance.setScale(3);
+    // Instead of scaling by 3, set width and height directly
+    this.beachEntrance.displayWidth = this.beachEntrance.width * 3;
+    this.beachEntrance.displayHeight = this.beachEntrance.height * 3;
     this.beachEntrance.setTint(0xf7e26b); // Sand color
     this.beachEntrance.setAlpha(0.7);
     this.beachEntrance.setImmovable(true);
@@ -500,12 +542,14 @@ class GameScene extends Phaser.Scene {
     // Create a physics-enabled house sprite
     this.house = this.physics.add.sprite(250, 250, "house");
     this.house.setOrigin(0.5, 0.5);
-    this.house.setScale(2);
+    // Instead of scaling by 2, set width and height directly
+    this.house.displayWidth = this.house.width * 2;
+    this.house.displayHeight = this.house.height * 2;
     this.house.setDepth(1);
     this.house.setImmovable(true);
     this.house.body.allowGravity = false;
     
-    // Create a smaller but still effective collision box
+    // Create a collision box adjusted for the new size
     this.house.body.setSize(
       this.house.width * 0.7, 
       this.house.height * 0.4
@@ -528,7 +572,7 @@ class GameScene extends Phaser.Scene {
   populateUI() {
     // Create greeting and time labels
     this.greetingLabel = this.add.text(10, 10, "", { font: "20px Arial", fill: "#ffffff" });
-    this.timeLabel = this.add.text(10, 40, "", { font: "20px Arial", fill: "#ffffff" });
+    this.timeLabel = this.add.text(10, 40, "", { font: "18px Arial", fill: "#ffffff" });
     this.moneyText = this.add.text(GAME_SIZE.width - 150, 10, `Money: $${this.money}`, { font: "20px Arial", fill: "#ffffff" });
     
     // Add labels to UI container
@@ -539,6 +583,9 @@ class GameScene extends Phaser.Scene {
     
     // Create progress bars and labels
     this.createProgressBars();
+    
+    // Make sure UI displays current values
+    this.updateUI();
   }
   
   createProgressBars() {
@@ -682,6 +729,18 @@ class GameScene extends Phaser.Scene {
       this.gameDay++;
       let nextDayIndex = (this.weekDays.indexOf(this.currentWeekDay) + 1) % 7;
       this.currentWeekDay = this.weekDays[nextDayIndex];
+      
+      // Day has changed - update global day tracker and reset chores
+      if (currentGameDay !== this.gameDay) {
+        currentGameDay = this.gameDay;
+        // Reset all completed chores when day changes
+        completedChores = {};
+        // Also update the window reference if it exists
+        if (typeof window !== 'undefined') {
+          window.completedChores = completedChores;
+        }
+        console.log("New day started. All housework has been reset.");
+      }
     }
   
     // Calculate hours and minutes
@@ -723,6 +782,9 @@ class GameScene extends Phaser.Scene {
     if (this.progressBars) {
       this.drawProgressBars();
     }
+
+    // Update global stats after local stats change
+    this.updateGlobalStats();
 
     // Check for game over condition
     if (this.hunger === 0 || this.energy === 0 || this.hygiene === 0 || this.happiness === 0) {
@@ -803,7 +865,7 @@ class GameScene extends Phaser.Scene {
     return !isLoadingHouse;
   }
 
-  // Add this function to GameScene to handle house entry
+  // Update enterHouse method to pass player stats to house scene
   enterHouse() {
     if (isLoadingHouse || isTransitioning) return;
     
@@ -812,6 +874,9 @@ class GameScene extends Phaser.Scene {
       x: this.player.x, 
       y: this.player.y + 50 // Add offset to prevent player from getting stuck in house collision
     };
+    
+    // Update global stats before scene change
+    this.updateGlobalStats();
     
     // Set transition flags to prevent movement and multiple triggers
     isLoadingHouse = true;
@@ -854,7 +919,7 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  // Add beach entrance method
+  // Update enterBeach method
   enterBeach() {
     if (isLoadingBeach || isTransitioning) return;
     
@@ -863,6 +928,9 @@ class GameScene extends Phaser.Scene {
       x: this.player.x, 
       y: this.player.y
     };
+    
+    // Update global stats before scene change
+    this.updateGlobalStats();
     
     // Set transition flags
     isLoadingBeach = true;
@@ -901,6 +969,19 @@ class GameScene extends Phaser.Scene {
   canEnterBeach() {
     // Only allow entry if not already loading and not in transition
     return !isLoadingBeach && !isTransitioning;
+  }
+
+  // Add a helper method to update all UI elements
+  updateUI() {
+    // Update money text
+    if (this.moneyText) {
+      this.moneyText.setText(`Money: $${this.money}`);
+    }
+    
+    // Update progress bars
+    if (this.progressBars) {
+      this.drawProgressBars();
+    }
   }
 }
 
@@ -1059,7 +1140,7 @@ function createSettingsMenu() {
   const devToolsInfo = document.createElement('div');
   devToolsInfo.style.fontSize = '12px';
   devToolsInfo.style.marginTop = '5px';
-  devToolsInfo.innerHTML = 'Use ` (backtick) to toggle dev tools<br>+ / - to adjust time speed<br>0 to reset time speed';
+  devToolsInfo.innerHTML = 'Use ` (backtick) to toggle dev tools<br>+ / - to adjust time speed<br>0 to reset time speed<br>C to copy player coordinates';
   
   devToolsDiv.appendChild(devToolsLabel);
   devToolsDiv.appendChild(devToolsToggle);
@@ -1160,6 +1241,18 @@ function updateDevToolsDisplay() {
     devToolsElement.style.fontSize = '14px';
     devToolsElement.style.zIndex = '2000';
     document.body.appendChild(devToolsElement);
+    
+    // Add C key listener for copying player coordinates
+    document.addEventListener('keydown', (event) => {
+      if (showDevTools && event.key.toLowerCase() === 'c') {
+        copyPlayerCoordinates();
+      }
+    });
+    
+    // Setup real-time coordinate updates
+    if (showDevTools) {
+      startCoordinateUpdates();
+    }
   }
   
   // Update visibility
@@ -1167,13 +1260,131 @@ function updateDevToolsDisplay() {
   
   // Update content if visible
   if (showDevTools) {
-    devToolsElement.innerHTML = `
-      <div>DEVELOPER TOOLS</div>
-      <div>Time Speed: ${timeMultiplier}x</div>
-      <div>Controls:</div>
-      <div>+ : Speed up time</div>
-      <div>- : Slow down time</div>
-      <div>0 : Reset time speed</div>
-    `;
+    updateCoordinatesDisplay();
+    startCoordinateUpdates();
+  } else {
+    stopCoordinateUpdates();
+  }
+}
+
+// Global variable for coordinate update interval
+let coordinateUpdateInterval = null;
+
+// Function to start real-time coordinate updates
+function startCoordinateUpdates() {
+  // Clear any existing interval first
+  stopCoordinateUpdates();
+  
+  // Start a new interval that updates every 100ms (10 times per second)
+  coordinateUpdateInterval = setInterval(updateCoordinatesDisplay, 100);
+}
+
+// Function to stop coordinate updates
+function stopCoordinateUpdates() {
+  if (coordinateUpdateInterval) {
+    clearInterval(coordinateUpdateInterval);
+    coordinateUpdateInterval = null;
+  }
+}
+
+// Function to update just the coordinates display
+function updateCoordinatesDisplay() {
+  const devToolsElement = document.getElementById('devTools');
+  if (!devToolsElement || !showDevTools) return;
+  
+  // Get player coordinates if available
+  let playerX = 'N/A';
+  let playerY = 'N/A';
+  let screenX = 'N/A';
+  let screenY = 'N/A';
+  let currentScene = 'N/A';
+  
+  if (game && game.scene.scenes) {
+    const activeScene = game.scene.scenes.find(scene => 
+      (scene.scene.key === 'scene-game' || scene.scene.key === 'scene-house' || scene.scene.key === 'scene-beach') && 
+      scene.scene.isActive()
+    );
+    
+    if (activeScene && activeScene.player) {
+      // World coordinates
+      playerX = Math.round(activeScene.player.x);
+      playerY = Math.round(activeScene.player.y);
+      currentScene = activeScene.scene.key;
+      
+      // Calculate screen coordinates
+      const camera = activeScene.cameras.main;
+      if (camera) {
+        screenX = Math.round(activeScene.player.x - camera.scrollX);
+        screenY = Math.round(activeScene.player.y - camera.scrollY);
+      }
+    }
+  }
+  
+  devToolsElement.innerHTML = `
+    <div>DEVELOPER TOOLS</div>
+    <div>Time Speed: ${timeMultiplier}x</div>
+    <div>Scene: ${currentScene}</div>
+    <div>World X: ${playerX} | Y: ${playerY}</div>
+    <div>Screen X: ${screenX} | Y: ${screenY}</div>
+    <div>Controls:</div>
+    <div>+ : Speed up time</div>
+    <div>- : Slow down time</div>
+    <div>0 : Reset time speed</div>
+    <div>C : Copy coordinates</div>
+  `;
+}
+
+// Update copyPlayerCoordinates to include screen coordinates
+function copyPlayerCoordinates() {
+  if (game && game.scene.scenes) {
+    const activeScene = game.scene.scenes.find(scene => 
+      (scene.scene.key === 'scene-game' || scene.scene.key === 'scene-house' || scene.scene.key === 'scene-beach') && 
+      scene.scene.isActive()
+    );
+    
+    if (activeScene && activeScene.player) {
+      // World coordinates
+      const worldX = Math.round(activeScene.player.x);
+      const worldY = Math.round(activeScene.player.y);
+      const sceneName = activeScene.scene.key;
+      
+      // Screen coordinates
+      let screenX = 'N/A';
+      let screenY = 'N/A';
+      const camera = activeScene.cameras.main;
+      if (camera) {
+        screenX = Math.round(activeScene.player.x - camera.scrollX);
+        screenY = Math.round(activeScene.player.y - camera.scrollY);
+      }
+      
+      const coordText = `Scene: ${sceneName}\nWorld X: ${worldX}, Y: ${worldY}\nScreen X: ${screenX}, Y: ${screenY}`;
+      
+      // Create temporary textarea to copy to clipboard
+      const textarea = document.createElement('textarea');
+      textarea.value = coordText;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      
+      // Show feedback that coordinates were copied
+      const notification = document.createElement('div');
+      notification.textContent = 'Coordinates copied to clipboard!';
+      notification.style.position = 'absolute';
+      notification.style.top = '50px';
+      notification.style.right = '10px';
+      notification.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+      notification.style.color = '#fff';
+      notification.style.padding = '10px';
+      notification.style.borderRadius = '5px';
+      notification.style.fontFamily = 'monospace';
+      notification.style.zIndex = '2001';
+      document.body.appendChild(notification);
+      
+      // Remove notification after 2 seconds
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 2000);
+    }
   }
 }

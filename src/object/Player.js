@@ -21,11 +21,11 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.cursor = scene.input.keyboard.createCursorKeys();
     
     // Configure player sprite
-    this.setScale(CHARACTER_SPRITES[character].scale);
+    this.setScale(CHARACTER_SPRITES[character].scale/1.2);
     
     // Apply character tint if specified
     if (CHARACTER_SPRITES[character].tint) {
-      this.setTint(CHARACTER_SPRITES[character].tint);
+      this.setTint(CHARACTER_SPRITES[character].tint/1.2);
     }
     
     this.setImmovable(false);
@@ -52,8 +52,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (!scene.anims.exists('walk-right')) {
       scene.anims.create({
         key: 'walk-right',
-        frames: scene.anims.generateFrameNumbers('player', { start: 6, end: 11 }),
-        frameRate: 24,
+        frames: scene.anims.generateFrameNumbers('player', { start: 8, end: 11 }),
+        frameRate: 8,
         repeat: -1
       });
     }
@@ -61,8 +61,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (!scene.anims.exists('walk-up')) {
       scene.anims.create({
         key: 'walk-up',
-        frames: scene.anims.generateFrameNumbers('player', { start: 12, end: 17 }),
-        frameRate: 24,
+        frames: scene.anims.generateFrameNumbers('player', { start: 4, end: 7 }),
+        frameRate: 8,
         repeat: -1
       });
     }
@@ -70,8 +70,8 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     if (!scene.anims.exists('walk-down')) {
       scene.anims.create({
         key: 'walk-down',
-        frames: scene.anims.generateFrameNumbers('player', { start: 0, end: 5 }),
-        frameRate: 24,
+        frames: scene.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
+        frameRate: 8,
         repeat: -1
       });
     }
