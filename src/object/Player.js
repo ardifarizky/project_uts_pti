@@ -2,14 +2,16 @@ import Phaser from 'phaser';
 
 // Character sprite configurations
 const CHARACTER_SPRITES = {
-  ucup: { spritesheet: 'player', scale: 2 },
-  budi: { spritesheet: 'player', scale: 2, tint: 0xadd8e6 }, // Light blue tint
-  doni: { spritesheet: 'player', scale: 2, tint: 0xffa500 }  // Orange tint
+  ucup: { spritesheet: 'player1', scale: 2 },
+  aminah: { spritesheet: 'player2', scale: 2 },
+  adel: { spritesheet: 'player3', scale: 2 },
+  gekko: { spritesheet: 'player4', scale: 2 }
 };
 
 class Player extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y, character = 'ucup') {
-    super(scene, x, y, 'player');
+    // Use the proper spritesheet based on character selection
+    super(scene, x, y, CHARACTER_SPRITES[character].spritesheet);
     
     // Add this sprite to the scene and enable physics
     scene.add.existing(this);
@@ -22,11 +24,6 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     
     // Configure player sprite
     this.setScale(CHARACTER_SPRITES[character].scale/1.2);
-    
-    // Apply character tint if specified
-    if (CHARACTER_SPRITES[character].tint) {
-      this.setTint(CHARACTER_SPRITES[character].tint/1.2);
-    }
     
     this.setImmovable(false);
     this.body.allowGravity = false;
@@ -48,57 +45,61 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   }
   
   createAnimations(scene) {
+    // Define animation base key with character name to make them unique per character
+    const animPrefix = `${this.character}-`;
+    const spritesheet = CHARACTER_SPRITES[this.character].spritesheet;
+    
     // Only create animations if they don't already exist
-    if (!scene.anims.exists('walk-right')) {
+    if (!scene.anims.exists(`${animPrefix}walk-right`)) {
       scene.anims.create({
-        key: 'walk-right',
-        frames: scene.anims.generateFrameNumbers('player', { start: 8, end: 11 }),
+        key: `${animPrefix}walk-right`,
+        frames: scene.anims.generateFrameNumbers(spritesheet, { start: 8, end: 11 }),
         frameRate: 8,
         repeat: -1
       });
     }
     
-    if (!scene.anims.exists('walk-up')) {
+    if (!scene.anims.exists(`${animPrefix}walk-up`)) {
       scene.anims.create({
-        key: 'walk-up',
-        frames: scene.anims.generateFrameNumbers('player', { start: 4, end: 7 }),
+        key: `${animPrefix}walk-up`,
+        frames: scene.anims.generateFrameNumbers(spritesheet, { start: 4, end: 7 }),
         frameRate: 8,
         repeat: -1
       });
     }
     
-    if (!scene.anims.exists('walk-down')) {
+    if (!scene.anims.exists(`${animPrefix}walk-down`)) {
       scene.anims.create({
-        key: 'walk-down',
-        frames: scene.anims.generateFrameNumbers('player', { start: 0, end: 3 }),
+        key: `${animPrefix}walk-down`,
+        frames: scene.anims.generateFrameNumbers(spritesheet, { start: 0, end: 3 }),
         frameRate: 8,
         repeat: -1
       });
     }
     
     // Add new animations for actions
-    if (!scene.anims.exists('sleep')) {
+    if (!scene.anims.exists(`${animPrefix}sleep`)) {
       scene.anims.create({
-        key: 'sleep',
-        frames: scene.anims.generateFrameNumbers('player', { start: 16, end: 19 }),
+        key: `${animPrefix}sleep`,
+        frames: scene.anims.generateFrameNumbers(spritesheet, { start: 16, end: 19 }),
         frameRate: 5,
         repeat: -1
       });
     }
     
-    if (!scene.anims.exists('eat')) {
+    if (!scene.anims.exists(`${animPrefix}eat`)) {
       scene.anims.create({
-        key: 'eat',
-        frames: scene.anims.generateFrameNumbers('player', { start: 20, end: 23 }),
+        key: `${animPrefix}eat`,
+        frames: scene.anims.generateFrameNumbers(spritesheet, { start: 20, end: 23 }),
         frameRate: 5,
         repeat: -1
       });
     }
     
-    if (!scene.anims.exists('bath')) {
+    if (!scene.anims.exists(`${animPrefix}bath`)) {
       scene.anims.create({
-        key: 'bath',
-        frames: scene.anims.generateFrameNumbers('player', { start: 28, end: 31 }),
+        key: `${animPrefix}bath`,
+        frames: scene.anims.generateFrameNumbers(spritesheet, { start: 28, end: 31 }),
         frameRate: 5,
         repeat: -1
       });
@@ -111,6 +112,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   
   handleMovement() {
     const { left, right, up, down } = this.cursor;
+    const animPrefix = `${this.character}-`;
 
     // Reset velocity
     this.setVelocity(0);
@@ -132,23 +134,23 @@ class Player extends Phaser.Physics.Arcade.Sprite {
       this.setVelocityX(-speed);
       this.setFlipX(true);
       if (!(up.isDown || down.isDown)) {
-        this.anims.play('walk-right', true);
+        this.anims.play(`${animPrefix}walk-right`, true);
       }
     } else if (right.isDown) {
       this.setVelocityX(speed);
       this.setFlipX(false);
       if (!(up.isDown || down.isDown)) {
-        this.anims.play('walk-right', true);
+        this.anims.play(`${animPrefix}walk-right`, true);
       }
     }
 
     // Handle vertical movement
     if (up.isDown) {
       this.setVelocityY(-speed);
-      this.anims.play('walk-up', true);
+      this.anims.play(`${animPrefix}walk-up`, true);
     } else if (down.isDown) {
       this.setVelocityY(speed);
-      this.anims.play('walk-down', true);
+      this.anims.play(`${animPrefix}walk-down`, true);
     }
     
     // If no movement keys are pressed, stop animations
@@ -165,19 +167,19 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   // Action animations functions
   playSleepAnimation() {
     this.stopMovement();
-    this.anims.play('sleep', true);
+    this.anims.play(`${this.character}-sleep`, true);
     return this;
   }
   
   playEatAnimation() {
     this.stopMovement();
-    this.anims.play('eat', true);
+    this.anims.play(`${this.character}-eat`, true);
     return this;
   }
   
   playBathAnimation() {
     this.stopMovement();
-    this.anims.play('bath', true);
+    this.anims.play(`${this.character}-bath`, true);
     return this;
   }
   

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import Player from '../object/Player.js';
+import StatsUI from '../ui/StatsUI.js';
 
 class HouseScene extends Phaser.Scene {
   constructor() {
@@ -37,12 +38,7 @@ class HouseScene extends Phaser.Scene {
     this.completedChores = {};
     
     // UI elements
-    this.statsContainer = null;
-    this.energyText = null;
-    this.moneyText = null;
-    this.hungerText = null;
-    this.hygieneText = null;
-    this.happinessText = null;
+    this.statsUI = null; // Using global StatsUI
     this.choreButton = null;
     this.choreText = null;
     this.choreButtons = []; // Array to store multiple chore buttons
@@ -91,7 +87,8 @@ class HouseScene extends Phaser.Scene {
     this.createPlayer();
     this.createExitDoor();
     this.createChoreAreas();
-    this.createUI();
+    this.createChoreButton();
+    this.createStatsUI(); // Create global stats UI
     
     // Setup camera
     this.setupCamera();
@@ -107,9 +104,6 @@ class HouseScene extends Phaser.Scene {
   }
   
   update() {
-    // Update UI with latest stats
-    this.updateStatsUI();
-    
     // Skip movement during transitions
     if (this.isTransitioning) {
       return;
@@ -122,6 +116,11 @@ class HouseScene extends Phaser.Scene {
     
     // Update chore areas visibility
     this.updateChoreAreas();
+    
+    // Update global stats UI
+    if (this.statsUI) {
+      this.statsUI.update();
+    }
   }
 
   // ----------------------------------------
@@ -245,40 +244,15 @@ class HouseScene extends Phaser.Scene {
       }
     );
     
-    // Add indicators for each door
-    this.createDoorIndicators(worldX, worldY);
-    
-    // Add a visible debug rectangle to show the door collision area in dev mode
-    this.createDoorDebugVisual(worldX, worldY, tile);
+    // Debug visual removed to make exits completely invisible
   }
   
   createDoorIndicators(x, y) {
-    const doorText = this.add.text(
-      x,
-      y - 20,
-      "Exit",
-      { font: "18px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 4 }
-    );
-    doorText.setOrigin(0.5, 0.5);
-    
-    const doorArrow = this.add.text(
-      x,
-      y - 40,
-      "⬇️",
-      { font: "16px Arial" }
-    );
-    doorArrow.setOrigin(0.5, 0.5);
+    // Empty method - door indicators removed as requested
   }
   
   createDoorDebugVisual(x, y, tile) {
-    const debugRect = this.add.rectangle(
-      x, 
-      y,
-      tile.width * this.mapScale * 1.5,
-      tile.height * this.mapScale * 1.5,
-      0xff0000,
-      0.3
-    );
+    // Empty method - debug visuals removed as requested
   }
   
   displayDoorDebugInfo() {
@@ -295,15 +269,7 @@ class HouseScene extends Phaser.Scene {
       debugText.setOrigin(0.5, 0);
     } else {
       console.log(`Found ${this.doorTiles.length} door tiles`);
-      
-      // Add debug text to help with troubleshooting
-      const debugText = this.add.text(
-        this.gameSize.width / 2, 20,
-        `Found ${this.doorTiles.length} door tiles!`,
-        { font: "16px Arial", fill: "#00ff00" }
-      );
-      debugText.setScrollFactor(0);
-      debugText.setOrigin(0.5, 0);
+      // Debug text removed as requested
     }
   }
   
@@ -311,13 +277,18 @@ class HouseScene extends Phaser.Scene {
     // Don't allow exit if not active yet or during transition
     if (!this.exitActive || this.isTransitioning) return;
     
-    // Prepare data to pass to the next scene
+    // Prepare data to pass to the next scene with fixed spawn position
     const data = {
-      lastHousePos: { 
-        x: this.player.x / this.mapScale, 
-        y: this.player.y / this.mapScale 
-      },
+      // Use fixed spawn position instead of the player's last position
+      spawnAtStart: true, // Add a flag to indicate spawning at start position
       completedChores: this.completedChores
+    };
+    
+    // Store the last house position for when player returns to house
+    // This isn't needed for spawn but might be useful later
+    data.lastHousePos = { 
+      x: this.player.x / this.mapScale, 
+      y: this.player.y / this.mapScale 
     };
     
     // Set transition flag to prevent movement
@@ -638,9 +609,6 @@ class HouseScene extends Phaser.Scene {
           `You feel refreshed!\nEnergy +${chore.energyGain}`, 
           '#00ff00'
         );
-        
-        // Update UI
-        this.updateStatsUI();
       });
       
       return;
@@ -653,9 +621,6 @@ class HouseScene extends Phaser.Scene {
     
     // Increase money and update global
     this.updatePlayerStat('money', playerStats.money + chore.reward);
-    
-    // Update UI
-    this.updateStatsUI();
     
     // Show success message
     this.showTemporaryMessage(
@@ -676,41 +641,7 @@ class HouseScene extends Phaser.Scene {
   // ----------------------------------------
   
   createUI() {
-    this.createStatsDisplay();
     this.createChoreButton();
-  }
-  
-  createStatsDisplay() {
-    // Get current stats from global
-    const playerStats = this.getPlayerStats();
-    
-    // Create stats container
-    this.statsContainer = this.add.container(20, 20);
-    this.statsContainer.setScrollFactor(0);
-    this.statsContainer.setDepth(100);
-    
-    // Create stats text elements
-    const textStyle = { 
-      font: '18px Arial', 
-      fill: '#ffffff', 
-      stroke: '#000000', 
-      strokeThickness: 3 
-    };
-    
-    this.energyText = this.add.text(0, 0, `Energy: ${playerStats.energy}`, textStyle);
-    this.moneyText = this.add.text(0, 30, `Money: $${playerStats.money}`, textStyle);
-    this.hungerText = this.add.text(0, 60, `Hunger: ${playerStats.hunger}`, textStyle);
-    this.hygieneText = this.add.text(0, 90, `Hygiene: ${playerStats.hygiene}`, textStyle);
-    this.happinessText = this.add.text(0, 120, `Happiness: ${playerStats.happiness}`, textStyle);
-    
-    // Add texts to container
-    this.statsContainer.add([
-      this.energyText, 
-      this.moneyText,
-      this.hungerText,
-      this.hygieneText,
-      this.happinessText
-    ]);
   }
   
   createChoreButton() {
@@ -801,17 +732,19 @@ class HouseScene extends Phaser.Scene {
     });
   }
   
-  updateStatsUI() {
-    if (!this.statsContainer) return;
+  // Create global stats UI
+  createStatsUI() {
+    // Access global UI or create new one
+    if (window.globalStatsUI) {
+      // If UI exists from another scene, destroy it and recreate for this scene
+      window.globalStatsUI.container.destroy();
+      window.globalStatsUI = new StatsUI(this);
+    } else {
+      // Create new UI
+      window.globalStatsUI = new StatsUI(this);
+    }
     
-    const playerStats = this.getPlayerStats();
-    
-    // Update all stats text
-    if (this.energyText) this.energyText.setText(`Energy: ${playerStats.energy}`);
-    if (this.moneyText) this.moneyText.setText(`Money: $${playerStats.money}`);
-    if (this.hungerText) this.hungerText.setText(`Hunger: ${playerStats.hunger}`);
-    if (this.hygieneText) this.hygieneText.setText(`Hygiene: ${playerStats.hygiene}`);
-    if (this.happinessText) this.happinessText.setText(`Happiness: ${playerStats.happiness}`);
+    this.statsUI = window.globalStatsUI;
   }
   
   // ----------------------------------------
@@ -829,6 +762,11 @@ class HouseScene extends Phaser.Scene {
   updatePlayerStat(stat, value) {
     if (typeof window !== 'undefined' && window.playerStats) {
       window.playerStats[stat] = value;
+      
+      // Update the stats UI after changing a stat
+      if (this.statsUI) {
+        this.statsUI.update();
+      }
     }
   }
   

@@ -103,7 +103,7 @@ main{
   transform: translateY(-5px);
 }
 
-.character-card.selected {
+.character-card.active {
   border-color: #ffcc00;
   box-shadow: 0 0 15px rgba(255, 204, 0, 0.5);
 }
@@ -116,8 +116,6 @@ main{
   image-rendering: pixelated;
   margin: 0 auto;
   margin-bottom: 5px;
-  transform: scale(2);
-  transform-origin: center;
 }
 
 .character-img.budi {

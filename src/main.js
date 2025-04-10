@@ -7,6 +7,9 @@ import HouseScene from './scenes/HouseScene.js';
 import TutorialScene from './scenes/TutorialScene.js';
 import PreloadScene from './preload.js';
 import MainLandScene from './scenes/MainLandScene.js';
+import MountainScene from './scenes/MountainScene.js';
+import TempleScene from './scenes/TempleScene.js';
+import StatsUI from './ui/StatsUI.js';
 
 // ===================== GLOBAL VARIABLES & SETUP =====================
 let playerName = "Ucup"; // Default player name changed to "Ucup"
@@ -15,18 +18,24 @@ let isNameInputActive = true; // Default to true since name input starts active
 let isLoadingHouse = false;
 let isLoadingBeach = false; // New flag for beach transition
 let isLoadingMainland = false; // New flag for mainland transition
+let isLoadingMountain = false; // New flag for mountain transition
+let isLoadingTemple = false; // New flag for temple transition
 let isTransitioning = false; // New flag to disable movement during transitions
 let game; // Define game variable outside so we can access it later
 let lastPlayerPos = { x: 1900, y: 2941 };
 let lastHousePos = { x: 300, y: 200 }; // Center of house, away from exit door
 let lastBeachPos = { x: 100, y: 100 }; // Default beach position
 let lastMainlandPos = { x: 250, y: 250 }; // Default mainland position
+let lastMountainPos = { x: 250, y: 250 }; // Default mountain position
+let lastTemplePos = { x: 250, y: 250 }; // Default temple position
 let minimapVisible = true; // Add tracking variable for minimap visibility
 let isSettingsMenuOpen = false; // Track if settings menu is open
 let timeMultiplier = 1; // Time multiplier for developer tools
 let showDevTools = false; // Track if dev tools are visible
 let currentGameDay = 1; // Track current game day globally
 let completedChores = {}; // Global track of completed chores
+// Global statsUI reference
+let globalStatsUI = null;
 
 // Global player stats object to maintain consistency across scenes
 let playerStats = {
@@ -68,13 +77,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const playerNameInput = document.getElementById('playerName');
   playerNameInput.value = "Ucup";
 
-  // Extract and set front-facing sprites for character selection
-  Player.extractFrontSprite('/assets/Player/Player.png', (frontSprite) => {
-    characterCards.forEach(card => {
-      const img = card.querySelector('.character-img');
-      img.src = frontSprite.src;
-    });
-  });
+  // Update character selection cards with character info
+  updateCharacterCards();
 
   // ===================== NAME INPUT HANDLERS =====================
   document.getElementById('playerName').addEventListener('focus', () => {
@@ -190,51 +194,41 @@ document.addEventListener('DOMContentLoaded', function() {
   // Create settings menu elements (initially hidden)
   createSettingsMenu();
 
-  // ===================== CHARACTER SELECTION HANDLER =====================
-  // Handle character card selection
+  // ===================== CHARACTER SELECTION HANDLERS =====================
+  // Add event listeners for character selection
   characterCards.forEach(card => {
-    const character = card.getAttribute('data-character');
-    
-    // Mark the default character as selected
-    if (character === selectedCharacter) {
-      card.classList.add('selected');
-      document.getElementById(`${character}-choice`).checked = true;
-    }
-    
-    card.addEventListener('click', () => {
-      // Update selection visually
-      characterCards.forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
+    card.addEventListener('click', function() {
+      // Remove active class from all cards
+      characterCards.forEach(c => c.classList.remove('active'));
       
-      // Update the radio button
-      document.getElementById(`${character}-choice`).checked = true;
+      // Add active class to selected card
+      this.classList.add('active');
       
-      // Update the hidden select element to maintain compatibility
-      characterSelect.value = character;
+      // Get character data from the card
+      const characterId = this.getAttribute('data-character');
+      selectedCharacter = characterId;
       
-      // Update the global variable
-      selectedCharacter = character;
-      console.log(`Character selected: ${selectedCharacter}`);
-    });
-  });
-
-  // Keep the hidden select in sync (for backwards compatibility)
-  characterSelect.addEventListener("change", () => {
-    selectedCharacter = characterSelect.value;
-    console.log(`Character selected via dropdown: ${selectedCharacter}`);
-    
-    // Update the visual selection
-    characterCards.forEach(card => {
-      const cardCharacter = card.getAttribute('data-character');
-      if (cardCharacter === selectedCharacter) {
-        card.classList.add('selected');
-        document.getElementById(`${cardCharacter}-choice`).checked = true;
-      } else {
-        card.classList.remove('selected');
+      // Update player name input to match character
+      switch(characterId) {
+        case 'ucup': 
+          playerNameInput.value = "Ucup"; 
+          break;
+        case 'aminah': 
+          playerNameInput.value = "Aminah"; 
+          break;
+        case 'adel': 
+          playerNameInput.value = "Adel"; 
+          break;
+        case 'gekko': 
+          playerNameInput.value = "Gekko"; 
+          break;
       }
+      
+      playerName = playerNameInput.value;
     });
   });
 
+  // ===================== GAME START BUTTON =====================
   gameStartBtn.addEventListener("click", () => {
     const inputName = document.getElementById('playerName').value.trim();
 
@@ -276,16 +270,77 @@ document.addEventListener('DOMContentLoaded', function() {
       default: "arcade",
       arcade: {
         gravity: { y: SPEED_DOWN },
-        debug: true,
+        debug: false,
         fps: 60,
         tileBias: 32
       }
     },
-    scene: [PreloadScene, GameScene, HouseScene, Beach, TutorialScene, MainLandScene]
+    scene: [PreloadScene, GameScene, HouseScene, Beach, TutorialScene, MainLandScene, MountainScene, TempleScene]
   };
 
   // Initialize the game
   game = new Phaser.Game(config);
+
+  // Function to update character cards with sprite images
+  function updateCharacterCards() {
+    // Character data
+    const characters = [
+      { id: 'ucup', name: 'Ucup', spritesheet: 'player1', description: 'A helpful villager.' },
+      { id: 'aminah', name: 'Aminah', spritesheet: 'player2', description: 'Smart and resourceful.' },
+      { id: 'adel', name: 'Adel', spritesheet: 'player3', description: 'Artistic and creative.' },
+      { id: 'gekko', name: 'Gekko', spritesheet: 'player4', description: 'Strong and dependable.' }
+    ];
+    
+    // Set character data for each card
+    characterCards.forEach((card, index) => {
+      if (index < characters.length) {
+        const character = characters[index];
+        
+        // Set data attribute for character selection
+        card.setAttribute('data-character', character.id);
+        
+        // Set character name
+        const nameElement = card.querySelector('.character-name');
+        if (nameElement) nameElement.textContent = character.name;
+        
+        // Set character description
+        const descElement = card.querySelector('.character-desc');
+        if (descElement) descElement.textContent = character.description;
+        
+        // Preload and set character sprite image
+        loadAndSetCharacterSprite(card, character.spritesheet);
+        
+        // Add active class to the default character
+        if (character.id === selectedCharacter) {
+          card.classList.add('active');
+        }
+      }
+    });
+  }
+  
+  // Function to load and set character sprite image
+  function loadAndSetCharacterSprite(card, spriteKey) {
+    const img = new Image();
+    img.onload = function() {
+      // Create a canvas to extract the front-facing sprite
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;  // 2x scale for better quality
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      
+      // Draw the character's front-facing sprite (second frame in first row)
+      ctx.drawImage(img, 32 * 1, 0, 32, 32, 0, 0, 64, 64);
+      
+      // Set the image src
+      const imgElement = card.querySelector('.character-img');
+      if (imgElement) {
+        imgElement.src = canvas.toDataURL('image/png');
+      }
+    };
+    
+    // Load the sprite image
+    img.src = `/assets/Player/${spriteKey}.png`;
+  }
 });
 
 // ===================== GAME SCENE CLASS =====================
@@ -293,40 +348,85 @@ class GameScene extends Phaser.Scene {
   constructor() {
     super("scene-game");
     
-    // Player properties
+    // Game map configuration
+    this.mapScale = 3;
+    
+    // Player configuration
+    this.playerName = playerName;
+    this.selectedCharacter = selectedCharacter;
+    this.PLAYER_SPEED = PLAYER_SPEED;
+    
+    // Player stats (now using global playerStats)
+    this.money = playerStats.money;
+    
+    // Time configuration
+    this.gameTimeEnabled = true;
+    this.gameTimeMinutes = 480; // Start at 8am (8 hours * 60 minutes)
+    this.gameHour = 8; // Start at 8am
+    this.gameMinute = 0;
+    this.gameDay = currentGameDay;
+    this.lastDayUpdateTime = 0;
+    this.weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    // Keep using current day of week for convenience
+    const now = new Date();
+    this.currentWeekDay = this.weekDays[now.getDay()];
+    this.greetingText = "";
+    
+    // Map elements
+    this.map = null;
+    this.groundsLayer = null;
+    this.bottomLayer = null;
+    this.obstaclesLayer = null;
+    this.topObstaclesLayer = null;
+    this.underObstaclesLayer = null;
+    
+    // Game objects
     this.player = null;
-    this.playerSpeed = PLAYER_SPEED;
-    
-    // Input controls
-    this.cursor = null;
-    
-    // Game state
-    this.isGameOver = false;
-    
-    // Game time
-    this.initializeGameTime();
-    
-    // Audio
-    this.coinMusic = null;
-    this.bgMusic = null;
-    
-    // Effects
-    this.emitter = null;
+    this.house = null;
+    this.travelBus = null;
+    this.travelMenu = null;
     
     // UI elements
-    this.greetingLabel = null;
+    this.uiContainer = null;
+    this.greetingLabel = null; 
     this.timeLabel = null;
     this.moneyText = null;
-    this.progressBars = null;
+    
+    // Stats UI (will now use global StatsUI)
+    this.statsUI = null;
+    
+    // Time variables for day/night cycle
+    this.dayColor = 0xFFFFFF;
+    this.nightColor = 0x555588;
+    this.currentLightColor = this.dayColor;
+    
+    // Setup minimap variables
+    this.minimapCamera = null;
+    this.minimapBorder = null;
+    
+    // Particle effects
+    this.emitter = null;
+    
+    // Game timers
+    this.gameTimeEvent = null;
+    this.statsUpdateEvent = null;
   }
   
   // Add init method to receive data from HouseScene
   init(data) {
     console.log("GameScene init called with data:", data);
     
-    if (data && data.lastHousePos) {
-      lastHousePos = data.lastHousePos;
-      console.log("Updated lastHousePos:", lastHousePos);
+    if (data) {
+      // Check if we should spawn at the default position
+      if (data.spawnAtStart) {
+        console.log("Spawning player at default position");
+        lastPlayerPos = { x: 1900, y: 2941 }; // Reset to default spawn position
+      } 
+      // Still store lastHousePos for when player returns to house
+      else if (data.lastHousePos) {
+        lastHousePos = data.lastHousePos;
+        console.log("Updated lastHousePos:", lastHousePos);
+      }
     }
     
     // Always load stats from global playerStats
@@ -406,6 +506,11 @@ class GameScene extends Phaser.Scene {
       }
     });
     
+    // Initialize game time if not already set
+    if (!this.gameTimeMinutes) {
+      this.initializeGameTime();
+    }
+    
     // Create UI container first (but add elements later)
     this.uiContainer = this.add.container(0, 0);
     this.uiContainer.setScrollFactor(0);
@@ -440,6 +545,9 @@ class GameScene extends Phaser.Scene {
     
     // Create particle emitter
     this.createEmitter();
+    
+    // Create the global stats UI if not already created
+    this.createStatsUI();
   }
 
   setupEventListeners() {
@@ -536,11 +644,13 @@ class GameScene extends Phaser.Scene {
     // Create house entrance at specific coordinates
     this.createHouseEntrance();
     
-    // Create beach entrance area
-    this.createBeachEntrance();
+    // Create temple entrance
+    this.createTempleEntrance();
     
-    // Create mainland entrance area
-    this.createMainlandEntrance();
+    // Create travel bus station
+    this.createTravelBus();
+    
+    // Note: Individual beach and mountain entrances have been replaced by the travel bus
   }
   
   createHouseEntrance() {
@@ -586,64 +696,225 @@ class GameScene extends Phaser.Scene {
     );
   }
   
-  createBeachEntrance() {
-    // Create a beach entrance area
-    const beachEntrancePos = { x: 600, y: 400 };
-    this.beachEntrance = this.physics.add.sprite(beachEntrancePos.x, beachEntrancePos.y, 'player');
-    // Instead of scaling by 3, set width and height directly
-    this.beachEntrance.displayWidth = this.beachEntrance.width * 3;
-    this.beachEntrance.displayHeight = this.beachEntrance.height * 3;
-    this.beachEntrance.setTint(0xf7e26b); // Sand color
-    this.beachEntrance.setAlpha(0.7);
-    this.beachEntrance.setImmovable(true);
-    this.beachEntrance.body.allowGravity = false;
+  createTempleEntrance() {
+    // Create a temple entrance at specific coordinates
+    const templeEntrancePos = { x: 2879, y: 672 };
+    this.templeEntrance = this.physics.add.sprite(templeEntrancePos.x, templeEntrancePos.y, 'player');
+    // Set size and appearance
+    this.templeEntrance.displayWidth = this.templeEntrance.width * 2;
+    this.templeEntrance.displayHeight = this.templeEntrance.height * 2;
+    this.templeEntrance.setTint(0xFFD700); // Gold color for temple
+    this.templeEntrance.setAlpha(0); // Make the entrance sprite invisible
+    this.templeEntrance.setImmovable(true);
+    this.templeEntrance.body.allowGravity = false;
+    this.templeEntrance.setDepth(6); // Set a higher depth to ensure collision works
     
-    // Add beach sign
-    const beachSign = this.add.text(
-      beachEntrancePos.x, beachEntrancePos.y - 30, 
-      "→ BEACH →", 
+    // Add a debug visual to show hitbox clearly but make it invisible
+    const debugRect = this.add.rectangle(
+      templeEntrancePos.x,
+      templeEntrancePos.y,
+      this.templeEntrance.displayWidth,
+      this.templeEntrance.displayHeight,
+      0xff0000,
+      0 // Set alpha to 0 to hide debug rectangle
+    );
+    debugRect.setDepth(5);
+    
+    // Add temple sign with floating animation
+    const templeSign = this.add.text(
+      templeEntrancePos.x, templeEntrancePos.y - 30, 
+      "TEMPLE", 
       { font: "bold 16px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 3 }
     );
-    beachSign.setOrigin(0.5, 0.5);
+    templeSign.setOrigin(0.5, 0.5);
+    templeSign.setDepth(7); // Set above the entrance
     
-    // Add interaction with beach entrance
+    // Add floating animation to the temple sign
+    this.tweens.add({
+      targets: templeSign,
+      y: templeEntrancePos.y - 40, // Float up by 10 pixels
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    
+    // Add interaction with temple entrance
     this.physics.add.overlap(
       this.player, 
-      this.beachEntrance, 
-      this.enterBeach, 
-      this.canEnterBeach, 
+      this.templeEntrance, 
+      this.enterTemple, 
+      () => !isTransitioning, // Only enter if not already transitioning
       this
     );
   }
   
-  createMainlandEntrance() {
-    // Create a mainland entrance area
-    const mainlandEntrancePos = { x: 1000, y: 200 };
-    this.mainlandEntrance = this.physics.add.sprite(mainlandEntrancePos.x, mainlandEntrancePos.y, 'player');
-    // Instead of scaling by 3, set width and height directly
-    this.mainlandEntrance.displayWidth = this.mainlandEntrance.width * 3;
-    this.mainlandEntrance.displayHeight = this.mainlandEntrance.height * 3;
-    this.mainlandEntrance.setTint(0x8ac541); // Green color
-    this.mainlandEntrance.setAlpha(0.7);
-    this.mainlandEntrance.setImmovable(true);
-    this.mainlandEntrance.body.allowGravity = false;
+  createTravelBus() {
+    // Create a travel bus hitbox at specific coordinates
+    const busPosX = 2904;
+    const busPosY = 2915;
     
-    // Add mainland sign
-    const mainlandSign = this.add.text(
-      mainlandEntrancePos.x, mainlandEntrancePos.y - 30, 
-      "→ MAINLAND →", 
-      { font: "bold 16px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 3 }
+    // Create the hitbox
+    this.travelBus = this.physics.add.sprite(busPosX, busPosY, 'player');
+    this.travelBus.displayWidth = this.travelBus.width * 3;
+    this.travelBus.displayHeight = this.travelBus.height * 3;
+    this.travelBus.setTint(0x4682B4); // Steel blue color
+    this.travelBus.setAlpha(0.7);
+    this.travelBus.setImmovable(true);
+    this.travelBus.body.allowGravity = false;
+    
+    // Add travel bus sign
+    const busSign = this.add.text(
+      busPosX, busPosY - 50, 
+      "TRAVEL BUS", 
+      { font: "bold 20px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 3 }
     );
-    mainlandSign.setOrigin(0.5, 0.5);
+    busSign.setOrigin(0.5, 0.5);
+    busSign.setDepth(100);
     
-    // Add interaction with mainland entrance
+    // Add floating animation to the bus sign
+    this.tweens.add({
+      targets: busSign,
+      y: busPosY - 60, // Float up by 10 pixels
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    
+    // Add interaction with travel bus
     this.physics.add.overlap(
       this.player, 
-      this.mainlandEntrance, 
-      this.enterMainland, 
-      this.canEnterMainland, 
+      this.travelBus, 
+      this.showTravelOptions, 
+      () => !isTransitioning, // Only show travel options if not already transitioning
       this
     );
+  }
+  
+  showTravelOptions() {
+    // Skip if already showing travel options or in transition
+    if (this.travelMenu || isTransitioning) return;
+    
+    // Create a semi-transparent background
+    const menuBg = this.add.rectangle(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2,
+      400,
+      300,
+      0x000000,
+      0.8
+    );
+    menuBg.setScrollFactor(0);
+    menuBg.setDepth(1000);
+    
+    // Create title text
+    const titleText = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 - 100,
+      "Select Destination",
+      { font: "bold 24px Arial", fill: "#ffffff" }
+    );
+    titleText.setOrigin(0.5, 0.5);
+    titleText.setScrollFactor(0);
+    titleText.setDepth(1001);
+    
+    // Create mountain button
+    const mountainButton = this.add.rectangle(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 - 30,
+      300,
+      50,
+      0xA9A9A9 // Gray color for mountains
+    );
+    mountainButton.setScrollFactor(0);
+    mountainButton.setDepth(1001);
+    mountainButton.setInteractive({ useHandCursor: true });
+    
+    const mountainText = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 - 30,
+      "Mountains",
+      { font: "20px Arial", fill: "#ffffff" }
+    );
+    mountainText.setOrigin(0.5, 0.5);
+    mountainText.setScrollFactor(0);
+    mountainText.setDepth(1002);
+    
+    // Create beach button
+    const beachButton = this.add.rectangle(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 + 40,
+      300,
+      50,
+      0xf7e26b // Sand color
+    );
+    beachButton.setScrollFactor(0);
+    beachButton.setDepth(1001);
+    beachButton.setInteractive({ useHandCursor: true });
+    
+    const beachText = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 + 40,
+      "Beach",
+      { font: "20px Arial", fill: "#000000" }
+    );
+    beachText.setOrigin(0.5, 0.5);
+    beachText.setScrollFactor(0);
+    beachText.setDepth(1002);
+    
+    // Create cancel button
+    const cancelButton = this.add.rectangle(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 + 110,
+      300,
+      50,
+      0xff6347 // Tomato red
+    );
+    cancelButton.setScrollFactor(0);
+    cancelButton.setDepth(1001);
+    cancelButton.setInteractive({ useHandCursor: true });
+    
+    const cancelText = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 + 110,
+      "Cancel",
+      { font: "20px Arial", fill: "#ffffff" }
+    );
+    cancelText.setOrigin(0.5, 0.5);
+    cancelText.setScrollFactor(0);
+    cancelText.setDepth(1002);
+    
+    // Store all UI elements in a container
+    this.travelMenu = this.add.container(0, 0, [
+      menuBg, titleText, 
+      mountainButton, mountainText,
+      beachButton, beachText,
+      cancelButton, cancelText
+    ]);
+    this.travelMenu.setDepth(1000);
+    
+    // Add click handlers
+    mountainButton.on('pointerdown', () => {
+      this.closeTravelMenu();
+      this.enterMountain();
+    });
+    
+    beachButton.on('pointerdown', () => {
+      this.closeTravelMenu();
+      this.enterBeach();
+    });
+    
+    cancelButton.on('pointerdown', () => {
+      this.closeTravelMenu();
+    });
+  }
+  
+  closeTravelMenu() {
+    if (this.travelMenu) {
+      this.travelMenu.destroy();
+      this.travelMenu = null;
+    }
   }
   
   createPlayer() {
@@ -721,9 +992,22 @@ class GameScene extends Phaser.Scene {
   }
   
   setupTimers() {
+    // Clear any existing timers to prevent duplicates
+    if (this.gameTimeEvent) {
+      this.gameTimeEvent.remove();
+    }
+    if (this.statsUpdateEvent) {
+      this.statsUpdateEvent.remove();
+    }
+    
+    // Ensure timeMultiplier is defined
+    if (typeof timeMultiplier === 'undefined') {
+      timeMultiplier = 1;
+    }
+    
     // Game time update timer (every 100ms = 10 game minutes)
     this.gameTimeEvent = this.time.addEvent({
-      delay: 100,
+      delay: 100 / timeMultiplier,
       callback: this.updateGameTime,
       callbackScope: this,
       loop: true
@@ -731,13 +1015,16 @@ class GameScene extends Phaser.Scene {
     
     // Stats update timer (every 5 seconds)
     this.statsUpdateEvent = this.time.addEvent({
-      delay: 5000,
+      delay: 5000 / timeMultiplier,
       callback: this.updateStats,
       callbackScope: this,
       loop: true
     });
     
     // Game over check timer
+    if (this.timeEvent) {
+      this.timeEvent.remove();
+    }
     this.timeEvent = this.time.delayedCall(30000, () => {
       if (this.hunger === 0 || this.energy === 0 || this.hygiene === 0 || this.happiness === 0) {
         this.gameOver();
@@ -761,6 +1048,23 @@ class GameScene extends Phaser.Scene {
   }
 
   updateGameTime() {
+    // Safety check - if any required values are undefined, initialize them
+    if (this.gameTimeMinutes === undefined) {
+      this.gameTimeMinutes = 480; // 8:00 AM
+    }
+    if (this.gameDay === undefined) {
+      this.gameDay = 1;
+    }
+    if (!this.weekDays) {
+      this.weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const now = new Date();
+      this.currentWeekDay = this.weekDays[now.getDay()];
+    }
+    if (!this.currentWeekDay) {
+      const now = new Date();
+      this.currentWeekDay = this.weekDays[now.getDay()];
+    }
+    
     // Apply time multiplier to make time pass faster or slower
     this.gameTimeMinutes += timeMultiplier;
   
@@ -786,18 +1090,18 @@ class GameScene extends Phaser.Scene {
   
     // Calculate hours and minutes
     let hours = Math.floor(this.gameTimeMinutes / 60);
-    let minutes = this.gameTimeMinutes % 60;
-    let timeText = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    let minutes = Math.floor(this.gameTimeMinutes % 60);
+    let timeText = `${String(hours).padStart(2, "0")}:${String(Math.floor(minutes)).padStart(2, "0")}`;
   
     // Update greeting based on time of day
     if (hours >= 5 && hours < 12) {
-      this.greetingText = `Good Morning ${playerName}`;
+      this.greetingText = `Good Morning ${playerName || "Player"}`;
     } else if (hours >= 12 && hours < 18) {
-      this.greetingText = `Good Afternoon ${playerName}`;
+      this.greetingText = `Good Afternoon ${playerName || "Player"}`;
     } else if (hours >= 18 && hours < 22) {
-      this.greetingText = `Good Evening ${playerName}`;
+      this.greetingText = `Good Evening ${playerName || "Player"}`;
     } else {
-      this.greetingText = `Good Night ${playerName}`;
+      this.greetingText = `Good Night ${playerName || "Player"}`;
     }
   
     // Update text labels if they exist
@@ -819,11 +1123,6 @@ class GameScene extends Phaser.Scene {
       this.moneyText.setText(`Money: $${this.money}`);
     }
     
-    // Update progress bars if they exist
-    if (this.progressBars) {
-      this.drawProgressBars();
-    }
-
     // Update global stats after local stats change
     this.updateGlobalStats();
 
@@ -834,24 +1133,7 @@ class GameScene extends Phaser.Scene {
   }
   
   drawProgressBars() {
-    // Safety check - make sure progress bars exist
-    if (!this.progressBars) return;
-    
-    // Clear previous bars
-    Object.values(this.progressBars).forEach(bar => bar.clear());
-  
-    // Colors for bars: red, yellow, green, blue
-    const colors = [0xff0000, 0xffff00, 0x00ff00, 0x0000ff];
-    const stats = [this.hunger, this.energy, this.hygiene, this.happiness];
-    const bars = ["hunger", "energy", "hygiene", "happiness"];
-    
-    // Draw each bar
-    for (let i = 0; i < bars.length; i++) {
-      if (this.progressBars[bars[i]]) {
-        this.progressBars[bars[i]].fillStyle(colors[i], 1);
-        this.progressBars[bars[i]].fillRect(GAME_SIZE.width - 140, 50 + i * 20, stats[i], 10);
-      }
-    }
+    // No longer needed as we're using StatsUI
   }  
 
   gameOver() {
@@ -869,6 +1151,10 @@ class GameScene extends Phaser.Scene {
   }
 
   update() {
+    if (this.isGameOver) {
+      return;
+    }
+    
     // Skip movement if name input is active or during transitions
     if (isNameInputActive || isTransitioning) {
       return;
@@ -898,6 +1184,11 @@ class GameScene extends Phaser.Scene {
     if (this.player) {
       this.player.update();
     }
+    
+    // Update the global stats UI
+    if (this.statsUI) {
+      this.statsUI.update();
+    }
   }
 
   // Add this function to GameScene to handle house entry
@@ -908,44 +1199,26 @@ class GameScene extends Phaser.Scene {
 
   // Update enterHouse method to pass player stats to house scene
   enterHouse() {
-    if (isLoadingHouse || isTransitioning) return;
+    if (isTransitioning || !this.canEnterHouse()) {
+      return;
+    }
     
-    // Store current player position before entering house
-    lastPlayerPos = { 
-      x: this.player.x, 
-      y: this.player.y + 50 // Add offset to prevent player from getting stuck in house collision
-    };
+    // Save current player position for when they return from the house
+    if (lastPlayerPos && this.player) {
+      lastPlayerPos = { x: this.player.x, y: this.player.y };
+    }
     
-    // Update global stats before scene change
-    this.updateGlobalStats();
-    
-    // Set transition flags to prevent movement and multiple triggers
-    isLoadingHouse = true;
+    // Transition to house scene
     isTransitioning = true;
+    isLoadingHouse = true;
     
-    // Stop player movement
-    this.player.stopMovement();
+    // Use a safety timer to handle transition issues
+    addSafetyResetTimer();
     
-    // Create a loading screen overlay
-    const loadingScreen = this.add.rectangle(
-      0, 0, 
-      GAME_SIZE.width, GAME_SIZE.height, 
-      0x000000, 0.8
-    );
-    loadingScreen.setOrigin(0, 0);
-    loadingScreen.setScrollFactor(0);
-    loadingScreen.setDepth(1000);
+    // Show transition screen
+    this.createTransitionMessage("Entering house...");
     
-    const loadingText = this.add.text(
-      GAME_SIZE.width/2, GAME_SIZE.height/2, 
-      "Entering house...", 
-      { font: "24px Arial", fill: "#ffffff" }
-    );
-    loadingText.setOrigin(0.5);
-    loadingText.setScrollFactor(0);
-    loadingText.setDepth(1001);
-    
-    // Wait a moment before transitioning to house scene
+    // Transition to house scene after a delay
     this.time.delayedCall(1500, () => {
       isLoadingHouse = false;
       // Keep isTransitioning true until the house scene has fully loaded
@@ -960,115 +1233,143 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  // Update enterBeach method
   enterBeach() {
-    if (isLoadingBeach || isTransitioning) return;
+    // Check if already transitioning
+    if (isTransitioning) {
+      return;
+    }
     
-    // Store current player position before entering beach
-    lastPlayerPos = { 
-      x: this.player.x, 
-      y: this.player.y
-    };
+    // Save last player position for when they return from the beach
+    if (typeof window !== 'undefined') {
+      window.lastBeachPos = { x: 250, y: 250 };
+    }
     
-    // Update global stats before scene change
-    this.updateGlobalStats();
-    
-    // Set transition flags
-    isLoadingBeach = true;
+    // Transition to beach scene
     isTransitioning = true;
     
-    // Stop player movement
-    this.player.stopMovement();
+    // Use a safety timer to handle transition issues
+    addSafetyResetTimer();
     
-    // Create a loading screen overlay
-    const loadingScreen = this.add.rectangle(
-      0, 0, 
-      GAME_SIZE.width, GAME_SIZE.height, 
-      0x000000, 0.8
-    );
-    loadingScreen.setOrigin(0, 0);
-    loadingScreen.setScrollFactor(0);
-    loadingScreen.setDepth(1000);
+    // Show transition screen
+    this.createTransitionMessage("Traveling to the beach...");
     
-    const loadingText = this.add.text(
-      GAME_SIZE.width/2, GAME_SIZE.height/2, 
-      "Going to the beach...", 
-      { font: "24px Arial", fill: "#ffffff" }
-    );
-    loadingText.setOrigin(0.5);
-    loadingText.setScrollFactor(0);
-    loadingText.setDepth(1001);
-    
-    // Wait a moment before transitioning to beach scene
-    this.time.delayedCall(1500, () => {
-      isLoadingBeach = false;
-      // Keep isTransitioning true until the beach scene has fully loaded
-      this.scene.start("scene-beach");
+    // Transition to beach scene after a delay
+    this.time.delayedCall(1000, () => {
+      try {
+        this.scene.start('scene-beach', {
+          playerName: this.playerName,
+          selectedCharacter: this.selectedCharacter,
+          PLAYER_SPEED: this.PLAYER_SPEED,
+          GAME_SIZE: this.GAME_SIZE,
+          lastBeachPos: window.lastBeachPos || { x: 250, y: 250 },
+          isTransitioning: false
+        });
+      } catch (error) {
+        console.error("Error starting beach scene:", error);
+        isTransitioning = false;
+      }
     });
   }
-
-  canEnterBeach() {
-    // Only allow entry if not already loading and not in transition
-    return !isLoadingBeach && !isTransitioning;
-  }
-
-  // Update enterMainland method
-  enterMainland() {
-    if (isLoadingMainland || isTransitioning) return;
+  
+  enterMountain() {
+    // Check if already transitioning
+    if (isTransitioning) {
+      return;
+    }
     
-    // Store current player position before entering mainland
-    lastPlayerPos = { 
-      x: this.player.x, 
-      y: this.player.y
-    };
+    // Save last player position for when they return from the mountains
+    if (typeof window !== 'undefined') {
+      window.lastMountainPos = { x: 250, y: 250 };
+    }
     
-    // Update global stats before scene change
-    this.updateGlobalStats();
-    
-    // Set transition flags
-    isLoadingMainland = true;
+    // Transition to mountain scene
     isTransitioning = true;
     
-    // Stop player movement
-    this.player.stopMovement();
+    // Use a safety timer to handle transition issues
+    addSafetyResetTimer();
     
-    // Create a loading screen overlay
-    const loadingScreen = this.add.rectangle(
-      0, 0, 
-      GAME_SIZE.width, GAME_SIZE.height, 
-      0x000000, 0.8
-    );
-    loadingScreen.setOrigin(0, 0);
-    loadingScreen.setScrollFactor(0);
-    loadingScreen.setDepth(1000);
+    // Show transition screen
+    this.createTransitionMessage("Traveling to the mountains...");
     
-    const loadingText = this.add.text(
-      GAME_SIZE.width/2, GAME_SIZE.height/2, 
-      "Going to the mainland...", 
-      { font: "24px Arial", fill: "#ffffff" }
-    );
-    loadingText.setOrigin(0.5, 0.5);
-    loadingText.setScrollFactor(0);
-    loadingText.setDepth(1001);
-    
-    // Wait a moment before transitioning to mainland scene
-    this.time.delayedCall(1500, () => {
-      isLoadingMainland = false;
-      // Keep isTransitioning true until the mainland scene has fully loaded
-      this.scene.start("scene-mainland", {
-        isTransitioning: isTransitioning,
-        lastMainlandPos: lastMainlandPos,
-        playerName: playerName,
-        selectedCharacter: selectedCharacter,
-        PLAYER_SPEED: PLAYER_SPEED,
-        GAME_SIZE: GAME_SIZE
-      });
+    // Transition to mountain scene after a delay
+    this.time.delayedCall(1000, () => {
+      try {
+        this.scene.start('scene-mountain', {
+          playerName: this.playerName,
+          selectedCharacter: this.selectedCharacter,
+          PLAYER_SPEED: this.PLAYER_SPEED,
+          GAME_SIZE: this.GAME_SIZE,
+          lastMountainPos: window.lastMountainPos || { x: 250, y: 250 },
+          isTransitioning: false
+        });
+      } catch (error) {
+        console.error("Error starting mountain scene:", error);
+        isTransitioning = false;
+      }
     });
   }
-
-  canEnterMainland() {
-    // Only allow entry if not already loading and not in transition
-    return !isLoadingMainland && !isTransitioning;
+  
+  enterTemple() {
+    // Check if already transitioning
+    if (isTransitioning) {
+      return;
+    }
+    
+    // Save last player position for when they return from the temple
+    if (typeof window !== 'undefined') {
+      window.lastTemplePos = { x: 250, y: 250 };
+    }
+    
+    // Transition to temple scene
+    isTransitioning = true;
+    
+    // Use a safety timer to handle transition issues
+    addSafetyResetTimer();
+    
+    // Show transition screen
+    this.createTransitionMessage("Entering the Temple...");
+    
+    // Transition to temple scene after a delay
+    this.time.delayedCall(1000, () => {
+      try {
+        this.scene.start('scene-temple', {
+          playerName: this.playerName,
+          selectedCharacter: this.selectedCharacter,
+          PLAYER_SPEED: this.PLAYER_SPEED,
+          GAME_SIZE: this.GAME_SIZE,
+          lastTemplePos: window.lastTemplePos || { x: 250, y: 250 },
+          isTransitioning: false
+        });
+      } catch (error) {
+        console.error("Error starting temple scene:", error);
+        isTransitioning = false;
+      }
+    });
+  }
+  
+  createTransitionMessage(message) {
+    // Create a semi-transparent black overlay
+    const overlay = this.add.rectangle(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2,
+      this.cameras.main.width,
+      this.cameras.main.height,
+      0x000000,
+      0.7
+    );
+    overlay.setScrollFactor(0);
+    overlay.setDepth(999);
+    
+    // Add message text
+    const text = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2,
+      message,
+      { font: "bold 24px Arial", fill: "#ffffff", align: "center" }
+    );
+    text.setOrigin(0.5, 0.5);
+    text.setScrollFactor(0);
+    text.setDepth(1000);
   }
 
   // Add a helper method to update all UI elements
@@ -1076,11 +1377,6 @@ class GameScene extends Phaser.Scene {
     // Update money text
     if (this.moneyText) {
       this.moneyText.setText(`Money: $${this.money}`);
-    }
-    
-    // Update progress bars
-    if (this.progressBars) {
-      this.drawProgressBars();
     }
   }
 
@@ -1096,61 +1392,52 @@ class GameScene extends Phaser.Scene {
     // Update game time
     this.updateGameTime();
     
-    // Create progress bars and labels
-    this.createProgressBars();
-    
     // Make sure UI displays current values
     this.updateUI();
   }
   
   createProgressBars() {
-    // Graphics for progress bars
-    this.progressBars = {
-      hunger: this.add.graphics(),
-      energy: this.add.graphics(),
-      hygiene: this.add.graphics(),
-      happiness: this.add.graphics(),
+    // No longer needed as we're using StatsUI
+  }
+
+  // Add method to create stats UI
+  createStatsUI() {
+    // Create new stats UI or use existing global one
+    if (globalStatsUI) {
+      // If we already have a global UI, destroy it properly to prevent memory leaks
+      globalStatsUI.destroy();
+    }
+    
+    // Create a fresh stats UI for this scene
+    globalStatsUI = new StatsUI(this);
+    this.statsUI = globalStatsUI;
+    
+    // Add window resize handler to reposition UI
+    const resizeHandler = () => {
+      if (this.statsUI) {
+        // Reposition UI to remain in top-right corner
+        const gameWidth = this.cameras.main.width;
+        this.statsUI.container.x = gameWidth - 255;
+      }
     };
     
-    // Set high depth for all progress bars
-    Object.values(this.progressBars).forEach(bar => {
-      bar.setDepth(100);
-    });
+    // Add the resize listener
+    window.addEventListener('resize', resizeHandler);
     
-    // Labels
-    const hungerLabel = this.add.text(GAME_SIZE.width - 220, 48, "Hunger:", { font: "14px Arial", fill: "#ffffff" });
-    const energyLabel = this.add.text(GAME_SIZE.width - 220, 68, "Energy:", { font: "14px Arial", fill: "#ffffff" });
-    const hygieneLabel = this.add.text(GAME_SIZE.width - 220, 88, "Hygiene:", { font: "14px Arial", fill: "#ffffff" });
-    const happinessLabel = this.add.text(GAME_SIZE.width - 220, 108, "Happiness:", { font: "14px Arial", fill: "#ffffff" });
-    
-    // Add to UI container so they stay fixed to the camera
-    this.uiContainer.add([hungerLabel, energyLabel, hygieneLabel, happinessLabel]);
-    this.uiContainer.add(Object.values(this.progressBars));
-    
-    // Draw initial progress bars
-    this.drawProgressBars();
+    // Store the handler to remove it later
+    this.statsUI.resizeHandler = resizeHandler;
   }
 }
 
 // Add a global safety timer function at the top level
 function addSafetyResetTimer() {
-  // If transition takes too long, force a reset
-  console.log("Safety timer started");
+  // After 5 seconds, force reset the transition state if it's still true
   setTimeout(() => {
     if (isTransitioning) {
-      console.log("Safety timeout triggered - resetting game state");
+      console.warn("Safety timer triggered: resetting transition state");
       isTransitioning = false;
-      isLoadingHouse = false;
-      if (game && game.scene) {
-        try {
-          game.scene.start('scene-game');
-        } catch (error) {
-          console.error("Error resetting game:", error);
-          location.reload(); // Last resort - reload the page
-        }
-      }
     }
-  }, 5000); // 5 seconds timeout
+  }, 5000);
 }
 
 // Create settings menu elements

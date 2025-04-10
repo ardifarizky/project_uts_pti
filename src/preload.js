@@ -110,9 +110,14 @@ export default class PreloadScene extends Phaser.Scene {
     this.load.audio("coin", "/assets/coin.mp3");
     this.load.audio("bgMusic", "/assets/bgMusic.mp3");
     
-    // Character assets
-    this.load.spritesheet('player', '/assets/Player/player1.png', {frameWidth: 32, frameHeight: 32});
-    this.load.image('playerSprite', '/assets/Player/Player.png');
+    // Character assets - Load all four character sprites
+    this.load.spritesheet('player1', '/assets/Player/player1.png', {frameWidth: 32, frameHeight: 32});
+    this.load.spritesheet('player2', '/assets/Player/Player2.png', {frameWidth: 32, frameHeight: 32});
+    this.load.spritesheet('player3', '/assets/Player/Player3.png', {frameWidth: 32, frameHeight: 32});
+    this.load.spritesheet('player4', '/assets/Player/Player4.png', {frameWidth: 32, frameHeight: 32});
+    
+    // Legacy player sprite - keep for backward compatibility
+    this.load.image('playerSprite', '/assets/Player/player1.png');
 
     this.load.image('exterior', '/assets/tiles/exterior1.png');
     this.load.image('interior', '/assets/tiles/interior1.png');
