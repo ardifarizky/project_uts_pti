@@ -31,7 +31,7 @@ class Player extends Phaser.Physics.Arcade.Sprite {
     this.setImmovable(false);
     this.body.allowGravity = false;
     this.setCollideWorldBounds(true);
-    this.setDepth(3);
+    this.setDepth(10);
     
     // Adjust player collision box
     this.body.setSize(

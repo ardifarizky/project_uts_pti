@@ -5,17 +5,36 @@ class Beach extends Phaser.Scene {
     constructor() {
         super("scene-beach");
         
+        // Configuration
+        this.mapScale = 2;
+        
         // Player properties
-        this.player = null;
+        this.playerName = "";
+        this.selectedCharacter = "ucup";
         this.playerSpeed = 350;
-        
-        // Input controls
-        this.cursor = null;
-        
-        // Game elements
-        this.exitArea = null;
-        this.waterArea = null;
+        this.lastBeachPos = { x: 480, y: 450 };
         this.isTransitioning = false;
+        
+        // Map dimensions
+        this.mapWidth = 100;
+        this.mapHeight = 100;
+        this.tileSize = 16;
+        
+        // Map layers
+        this.map = null;
+        this.waterLayer = null;
+        this.groundLayer = null;
+        this.roadLayer = null;
+        this.itemLayer = null;
+        this.wallLayer = null;
+        this.outerwallLayer = null;
+        this.botlayerLayer = null;
+        this.toplayerLayer = null;
+        this.obstacleLayer = null;
+        
+        // Game objects
+        this.player = null;
+        this.exitArea = null;
         
         // UI elements
         this.statsContainer = null;
@@ -26,52 +45,249 @@ class Beach extends Phaser.Scene {
         this.happinessText = null;
     }
     
+    // ----------------------------------------
+    // SCENE LIFECYCLE METHODS
+    // ----------------------------------------
+    
+    init(data) {
+        // Set external data 
+        if (data.playerName) this.playerName = data.playerName;
+        if (data.selectedCharacter) this.selectedCharacter = data.selectedCharacter;
+        if (data.PLAYER_SPEED) this.playerSpeed = data.PLAYER_SPEED;
+        if (data.lastBeachPos) this.lastBeachPos = data.lastBeachPos;
+        if (data.isTransitioning !== undefined) this.isTransitioning = data.isTransitioning;
+    }
+    
+    preload() {
+        // Load tilemap data
+        this.load.tilemapTiledJSON('beach-map', '/assets/tilemap/beach.json');
+        
+        // Load tileset images
+        this.load.image('sea1', '/assets/tiles/sea1.png');
+        this.load.image('exterior1', '/assets/tiles/exterior1.png');
+    }
+    
     create() {
         // Reset transition flag
         this.isTransitioning = false;
         
-        // Create beach environment
-        this.createEnvironment();
+        // Set physics world bounds to match map size
+        this.physics.world.setBounds(
+          0, 
+          0, 
+          this.mapWidth * this.tileSize * this.mapScale, 
+          this.mapHeight * this.tileSize * this.mapScale
+        );
         
-        // Create player
+        // Create the scene components in order
+        this.createMap();
         this.createPlayer();
-        
-        // Create exit area to return to main world
         this.createExitArea();
-        
-        // Create water area with hitbox
-        this.createWaterArea();
-        
-        // Display beach name
-        this.createBeachName();
-        
-        // Create UI for stats
         this.createStatsUI();
         
         // Setup camera
         this.setupCamera();
         
-        // Setup controls
-        this.setupControls();
+        // Display beach name
+        this.createBeachName();
     }
     
-    // Helper method to get playerStats from global
-    getPlayerStats() {
-        return typeof window !== 'undefined' && window.playerStats ? window.playerStats : { 
-            energy: 50, 
-            money: 100,
-            hunger: 50,
-            hygiene: 50,
-            happiness: 50
-        };
-    }
-    
-    // Helper method to update a specific stat
-    updatePlayerStat(stat, value) {
-        if (typeof window !== 'undefined' && window.playerStats) {
-            window.playerStats[stat] = value;
+    update() {
+        // Skip movement during transitions
+        if (this.isTransitioning) {
+            return;
         }
+        
+        // Update player
+        if (this.player) {
+            this.player.update();
+        }
+        
+        // Update stats UI
+        this.updateStatsUI();
     }
+
+    // ----------------------------------------
+    // MAP CREATION METHODS
+    // ----------------------------------------
+    
+    createMap() {
+        // Create the tilemap
+        this.map = this.make.tilemap({ key: 'beach-map' });
+        
+        // Add the tilesets to the map
+        const sea1Tileset = this.map.addTilesetImage('sea1', 'sea1');
+        const exterior1Tileset = this.map.addTilesetImage('exterior1', 'exterior1');
+        
+        // Create layers
+        this.waterLayer = this.map.createLayer('water', [sea1Tileset, exterior1Tileset]).setDepth(2);
+        this.groundLayer = this.map.createLayer('ground', [sea1Tileset, exterior1Tileset]).setDepth(1);
+        this.roadLayer = this.map.createLayer('road', [sea1Tileset, exterior1Tileset]).setDepth(2);
+        this.itemLayer = this.map.createLayer('item', [sea1Tileset, exterior1Tileset]).setDepth(3);
+        this.wallLayer = this.map.createLayer('wall', [sea1Tileset, exterior1Tileset]).setDepth(4);
+        this.outerwallLayer = this.map.createLayer('outerwall', [sea1Tileset, exterior1Tileset]).setDepth(5);
+        this.botlayerLayer = this.map.createLayer('botlayer', [sea1Tileset, exterior1Tileset]).setDepth(6);
+        this.toplayerLayer = this.map.createLayer('toplayer', [sea1Tileset, exterior1Tileset]).setDepth(7);
+        this.obstacleLayer = this.map.createLayer('obstacle', [sea1Tileset, exterior1Tileset]).setDepth(8);
+        
+        // Scale the layers by map scale factor
+        this.waterLayer.setScale(this.mapScale);
+        this.groundLayer.setScale(this.mapScale);
+        this.roadLayer.setScale(this.mapScale);
+        this.itemLayer.setScale(this.mapScale);
+        this.wallLayer.setScale(this.mapScale);
+        this.outerwallLayer.setScale(this.mapScale);
+        this.botlayerLayer.setScale(this.mapScale);
+        this.toplayerLayer.setScale(this.mapScale);
+        this.obstacleLayer.setScale(this.mapScale);
+        
+        // Set collision on layers
+        this.wallLayer.setCollisionByProperty({ collide: true });
+        this.botlayerLayer.setCollisionByProperty({ collide: true });
+        this.outerwallLayer.setCollisionByProperty({ collide: true });
+        this.obstacleLayer.setCollisionByProperty({ collide: true });
+        this.waterLayer.setCollisionByProperty({ collide: true });
+        
+        // If layers don't have collide property, set collisions by specific excluded indices
+        // This is a fallback if the tilemap doesn't have proper collision properties
+        if (!this.hasCollisionProperties()) {
+            this.wallLayer.setCollisionByExclusion([-1]);
+            this.botlayerLayer.setCollisionByExclusion([-1]);
+            this.outerwallLayer.setCollisionByExclusion([-1]);
+            this.obstacleLayer.setCollisionByExclusion([-1]);
+            this.waterLayer.setCollisionByExclusion([-1]);
+        }
+        
+        // Update map dimensions based on the loaded tilemap
+        this.mapWidth = this.map.width;
+        this.mapHeight = this.map.height;
+        this.tileSize = this.map.tileWidth;
+        
+        // Set layers to their default positions (0,0)
+        this.waterLayer.setPosition(0, 0);
+        this.groundLayer.setPosition(0, 0);
+        this.roadLayer.setPosition(0, 0);
+        this.itemLayer.setPosition(0, 0);
+        this.wallLayer.setPosition(0, 0);
+        this.outerwallLayer.setPosition(0, 0);
+        this.botlayerLayer.setPosition(0, 0);
+        this.toplayerLayer.setPosition(0, 0);
+        this.obstacleLayer.setPosition(0, 0);
+    }
+    
+    setupCamera() {
+        this.cameras.main.startFollow(this.player);
+        this.cameras.main.setBounds(
+            0, 
+            0, 
+            this.mapWidth * this.tileSize * this.mapScale, 
+            this.mapHeight * this.tileSize * this.mapScale
+        );
+    }
+
+    // ----------------------------------------
+    // PLAYER METHODS
+    // ----------------------------------------
+    
+    createPlayer() {
+        // Set default position if none provided
+        if (!window.lastBeachPos) {
+            // Place player in the middle of the map
+            window.lastBeachPos = {
+                x: (this.mapWidth * this.tileSize) / 2 / this.mapScale,
+                y: (this.mapHeight * this.tileSize) / 2 / this.mapScale
+            };
+        }
+        
+        // Create player using the Player class
+        this.player = new Player(
+            this, 
+            this.lastBeachPos.x * this.mapScale, 
+            this.lastBeachPos.y * this.mapScale,
+            this.selectedCharacter
+        );
+        
+        // Configure scene-specific settings
+        this.player.playerSpeed = this.playerSpeed;
+        
+        // Add collision with tilemap layers
+        this.physics.add.collider(this.player, this.wallLayer);
+        this.physics.add.collider(this.player, this.outerwallLayer);
+        this.physics.add.collider(this.player, this.obstacleLayer);
+        this.physics.add.collider(this.player, this.botlayerLayer);
+        this.physics.add.collider(this.player, this.waterLayer);
+    }
+    
+    // ----------------------------------------
+    // EXIT AREA METHODS
+    // ----------------------------------------
+    
+    createExitArea() {
+        // Calculate the position for the exit area (at the bottom of the map)
+        const exitY = this.mapHeight * this.tileSize * this.mapScale - 20;
+        const centerX = this.mapWidth * this.tileSize * this.mapScale / 2;
+        
+        // Create exit area at the bottom of the beach
+        this.exitArea = this.physics.add.sprite(centerX, exitY, 'player');
+        this.exitArea.setScale(30, 1); // Wide but thin area
+        this.exitArea.setAlpha(0.3); // Semi-transparent
+        this.exitArea.setTint(0xff0000); // Red tint
+        this.exitArea.setImmovable(true);
+        this.exitArea.body.allowGravity = false;
+        
+        // Add exit text
+        const exitText = this.add.text(
+            centerX, exitY - 20, 
+            "Exit Beach", 
+            { font: "18px Arial", fill: "#000000", stroke: "#ffffff", strokeThickness: 2 }
+        );
+        exitText.setOrigin(0.5, 0.5);
+        
+        // Add interaction with exit area
+        this.physics.add.overlap(
+            this.player, 
+            this.exitArea, 
+            this.exitBeach, 
+            null, 
+            this
+        );
+    }
+    
+    createBeachName() {
+        // Create a stylish beach name at the top center of the screen
+        const nameBackground = this.add.rectangle(
+            this.cameras.main.width / 2, 
+            50, 
+            300, 
+            60, 
+            0x000000
+        );
+        nameBackground.setAlpha(0.5);
+        nameBackground.setScrollFactor(0);
+        
+        const beachName = this.add.text(
+            this.cameras.main.width / 2, 
+            50, 
+            "SUNSET BEACH", 
+            { font: "bold 28px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 4 }
+        );
+        beachName.setOrigin(0.5, 0.5);
+        beachName.setScrollFactor(0);
+        
+        // Add a small animation to the beach name
+        this.tweens.add({
+            targets: beachName,
+            y: 55,
+            duration: 2000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+    }
+    
+    // ----------------------------------------
+    // UI METHODS
+    // ----------------------------------------
     
     createStatsUI() {
         // Create a container for stats UI elements
@@ -142,184 +358,26 @@ class Beach extends Phaser.Scene {
         if (this.happinessText) this.happinessText.setText(`Happiness: ${playerStats.happiness}`);
     }
     
-    createEnvironment() {
-        // Create beach sand background
-        const beachSand = this.add.rectangle(0, 0, 960, 540, 0xf7e26b);
-        beachSand.setOrigin(0, 0);
-        
-        // Create some decorative elements
-        
-        // Palm trees
-        for (let i = 0; i < 5; i++) {
-            const palmTree = this.add.circle(100 + i * 200, 100, 20, 0x2e8b57);
-            const palmLeaves = this.add.circle(100 + i * 200, 80, 35, 0x32cd32);
-            
-            // Make palm trees collidable
-            this.physics.add.existing(palmTree, true);
-            this.physics.add.collider(palmTree, this.player);
+    // ----------------------------------------
+    // UTILITY METHODS
+    // ----------------------------------------
+    
+    // Helper method to get playerStats from global
+    getPlayerStats() {
+        return typeof window !== 'undefined' && window.playerStats ? window.playerStats : { 
+            energy: 50, 
+            money: 100,
+            hunger: 50,
+            hygiene: 50,
+            happiness: 50
+        };
+    }
+    
+    // Helper method to update a specific stat
+    updatePlayerStat(stat, value) {
+        if (typeof window !== 'undefined' && window.playerStats) {
+            window.playerStats[stat] = value;
         }
-        
-        // Beach umbrellas
-        for (let i = 0; i < 3; i++) {
-            const umbrellaStand = this.add.rectangle(150 + i * 250, 250, 5, 30, 0x8b4513);
-            const umbrellaTop = this.add.circle(150 + i * 250, 235, 40, 0xff6347);
-            
-            // Make umbrella stands collidable
-            this.physics.add.existing(umbrellaStand, true);
-        }
-    }
-    
-    createPlayer() {
-        // Get last position from main scene or use default
-        const lastPos = window.lastBeachPos || { x: 480, y: 450 };
-        
-        // Create player using Player class
-        this.player = new Player(
-            this, 
-            lastPos.x, 
-            lastPos.y, 
-            window.selectedCharacter || 'ucup'
-        );
-        
-        // Set beach-specific player speed
-        this.player.playerSpeed = this.playerSpeed;
-    }
-    
-    createExitArea() {
-        // Create exit area at the bottom of the beach
-        this.exitArea = this.physics.add.sprite(480, 520, 'player');
-        this.exitArea.setScale(30, 1); // Wide but thin area
-        this.exitArea.setAlpha(0.3); // Semi-transparent
-        this.exitArea.setTint(0xff0000); // Red tint
-        this.exitArea.setImmovable(true);
-        this.exitArea.body.allowGravity = false;
-        
-        // Add exit text
-        const exitText = this.add.text(
-            480, 500, 
-            "Exit Beach", 
-            { font: "18px Arial", fill: "#000000", stroke: "#ffffff", strokeThickness: 2 }
-        );
-        exitText.setOrigin(0.5, 0.5);
-        
-        // Add interaction with exit area
-        this.physics.add.overlap(
-            this.player, 
-            this.exitArea, 
-            this.exitBeach, 
-            null, 
-            this
-        );
-    }
-    
-    createWaterArea() {
-        // Create water area with hitbox
-        this.waterArea = this.add.rectangle(480, 150, 960, 200, 0x1ca3ec);
-        this.waterArea.setAlpha(0.8);
-        
-        // Make water area a physics object
-        this.physics.add.existing(this.waterArea);
-        this.waterArea.body.setImmovable(true);
-        this.waterArea.body.allowGravity = false;
-        
-        // Add overlap with water
-        this.physics.add.overlap(
-            this.player, 
-            this.waterArea, 
-            this.enterWater, 
-            null, 
-            this
-        );
-    }
-    
-    createBeachName() {
-        // Create a stylish beach name
-        const nameBackground = this.add.rectangle(480, 50, 300, 60, 0x000000);
-        nameBackground.setAlpha(0.5);
-        
-        const beachName = this.add.text(
-            480, 50, 
-            "SUNSET BEACH", 
-            { font: "bold 28px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 4 }
-        );
-        beachName.setOrigin(0.5, 0.5);
-        
-        // Add a small animation to the beach name
-        this.tweens.add({
-            targets: beachName,
-            y: 55,
-            duration: 2000,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
-        });
-    }
-    
-    setupCamera() {
-        // Main camera follows player
-        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-        this.cameras.main.setBounds(0, 0, 960, 540);
-    }
-    
-    enterWater(player, water) {
-        // Slow down player in water
-        if (this.player) {
-            this.player.playerSpeed = 150;
-        }
-        
-        // Increase hygiene when in water
-        const playerStats = this.getPlayerStats();
-        if (playerStats.hygiene < 100) {
-            // Small increase in hygiene while swimming
-            this.updatePlayerStat('hygiene', Math.min(100, playerStats.hygiene + 0.1));
-            
-            // Decrease energy slightly while swimming
-            this.updatePlayerStat('energy', Math.max(0, playerStats.energy - 0.05));
-            
-            // Show water effects
-            if (Math.random() < 0.05) {
-                // Create a splash effect occasionally
-                const splash = this.add.circle(
-                    this.player.x + (Math.random() * 30 - 15),
-                    this.player.y + (Math.random() * 30 - 15),
-                    5,
-                    0xffffff,
-                    0.7
-                );
-                // Fade out and remove
-                this.tweens.add({
-                    targets: splash,
-                    alpha: 0,
-                    scale: 2,
-                    duration: 800,
-                    onComplete: () => splash.destroy()
-                });
-            }
-        }
-    }
-    
-    setupControls() {
-        // No need to create cursor keys as Player class handles its own input
-    }
-    
-    update() {
-        // Skip movement during transitions
-        if (this.isTransitioning) {
-            return;
-        }
-        
-        // Update player
-        if (this.player) {
-            this.player.update();
-        }
-        
-        // Reset player speed when out of water
-        if (this.player && this.waterArea && !this.physics.overlap(this.player, this.waterArea)) {
-            this.player.playerSpeed = 350;
-        }
-        
-        // Update stats UI
-        this.updateStatsUI();
     }
     
     exitBeach() {
@@ -329,7 +387,10 @@ class Beach extends Phaser.Scene {
         this.isTransitioning = true;
         
         // Store current player position before exiting
-        window.lastBeachPos = { x: this.player.x, y: this.player.y };
+        window.lastBeachPos = { 
+            x: this.player.x / this.mapScale, 
+            y: this.player.y / this.mapScale 
+        };
         
         // Stop player movement
         this.player.stopMovement();
@@ -337,7 +398,7 @@ class Beach extends Phaser.Scene {
         // Create a loading screen
         const loadingScreen = this.add.rectangle(
             0, 0, 
-            960, 540, 
+            this.cameras.main.width, this.cameras.main.height, 
             0x000000, 0.8
         );
         loadingScreen.setOrigin(0, 0);
@@ -345,7 +406,7 @@ class Beach extends Phaser.Scene {
         loadingScreen.setDepth(1000);
         
         const loadingText = this.add.text(
-            480, 270, 
+            this.cameras.main.width / 2, this.cameras.main.height / 2, 
             "Leaving beach...", 
             { font: "24px Arial", fill: "#ffffff" }
         );
@@ -359,6 +420,28 @@ class Beach extends Phaser.Scene {
             this.scene.stop('scene-beach');
             this.scene.start('scene-game');
         });
+    }
+    
+    // Helper method to check if any tiles have collision properties
+    hasCollisionProperties() {
+        // Check a few layers for collision properties
+        const layersToCheck = [this.wallLayer, this.outerwallLayer, this.obstacleLayer];
+        
+        for (const layer of layersToCheck) {
+            if (!layer) continue;
+            
+            // Check if any tiles have the collide property
+            let hasCollideProperty = false;
+            layer.forEachTile(tile => {
+                if (tile && tile.properties && tile.properties.collide) {
+                    hasCollideProperty = true;
+                }
+            });
+            
+            if (hasCollideProperty) return true;
+        }
+        
+        return false;
     }
 }
 

@@ -113,6 +113,10 @@ export default class PreloadScene extends Phaser.Scene {
     // Character assets
     this.load.spritesheet('player', '/assets/Player/player1.png', {frameWidth: 32, frameHeight: 32});
     this.load.image('playerSprite', '/assets/Player/Player.png');
+
+    this.load.image('exterior', '/assets/tiles/exterior1.png');
+    this.load.image('interior', '/assets/tiles/interior1.png');
+    this.load.image('room', '/assets/tiles/room1.png');
     
     // UI assets - check if file exists, otherwise use fallback
     this.load.image('minimapBg', '/assets/ui/minimap_bg.png').on('fileerror', () => {

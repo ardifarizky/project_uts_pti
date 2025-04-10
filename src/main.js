@@ -6,6 +6,7 @@ import Player, { CHARACTER_SPRITES } from './object/Player.js';
 import HouseScene from './scenes/HouseScene.js';
 import TutorialScene from './scenes/TutorialScene.js';
 import PreloadScene from './preload.js';
+import MainLandScene from './scenes/MainLandScene.js';
 
 // ===================== GLOBAL VARIABLES & SETUP =====================
 let playerName = "Ucup"; // Default player name changed to "Ucup"
@@ -13,11 +14,13 @@ let selectedCharacter = "ucup"; // Default character
 let isNameInputActive = true; // Default to true since name input starts active
 let isLoadingHouse = false;
 let isLoadingBeach = false; // New flag for beach transition
+let isLoadingMainland = false; // New flag for mainland transition
 let isTransitioning = false; // New flag to disable movement during transitions
 let game; // Define game variable outside so we can access it later
 let lastPlayerPos = { x: 100, y: 100 };
 let lastHousePos = { x: 300, y: 200 }; // Center of house, away from exit door
-let lastBeachPos = { x: 480, y: 450 }; // Default beach position
+let lastBeachPos = { x: 100, y: 100 }; // Default beach position
+let lastMainlandPos = { x: 250, y: 250 }; // Default mainland position
 let minimapVisible = true; // Add tracking variable for minimap visibility
 let isSettingsMenuOpen = false; // Track if settings menu is open
 let timeMultiplier = 1; // Time multiplier for developer tools
@@ -278,7 +281,7 @@ document.addEventListener('DOMContentLoaded', function() {
         tileBias: 32
       }
     },
-    scene: [PreloadScene, GameScene, HouseScene, Beach, TutorialScene]
+    scene: [PreloadScene, GameScene, HouseScene, Beach, TutorialScene, MainLandScene]
   };
 
   // Initialize the game
@@ -365,6 +368,18 @@ class GameScene extends Phaser.Scene {
     // Assets are now loaded in PreloadScene
     // Set world bounds
     this.physics.world.setBounds(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
+    
+    // Load tilemap data - copying approach from MainLandScene.js
+    this.load.tilemapTiledJSON('mainland-map', '/assets/tilemap/mainland.json');
+    
+    // Load tileset images
+    this.load.image('bedroom1', '/assets/tiles/bedroom1.png');
+    this.load.image('floor1', '/assets/tiles/floor1.png');
+    this.load.image('wall1', '/assets/tiles/wall1.png');
+    this.load.image('livingroom2', '/assets/tiles/livingroom2.png');
+    this.load.image('exterior1', '/assets/tiles/exterior1.png');
+    this.load.image('interior1', '/assets/tiles/interior1.png');
+    this.load.image('room1', '/assets/tiles/room1.png');
   }
 
   create() {
@@ -411,9 +426,6 @@ class GameScene extends Phaser.Scene {
     // Add world decorations (after player exists)
     this.createWorldDecorations();
     
-    // Create house
-    this.createHouse();
-
     // Setup camera and minimap
     this.setupCamera();
     
@@ -466,46 +478,99 @@ class GameScene extends Phaser.Scene {
   }
   
   createEnvironment() {
-    // Create a much larger world
-    this.physics.world.setBounds(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
+    // Create a tilemap using the same approach as in MainLandScene.js
+    this.map = this.make.tilemap({ key: 'mainland-map' });
     
-    // Add background - repeat it to fill the world
-    let bgTile = this.add.tileSprite(0, 0, WORLD_SIZE.width, WORLD_SIZE.height, "bg2");
-    bgTile.setOrigin(0, 0);
-    bgTile.setDepth(0);
+    // Add map scale factor
+    this.mapScale = 2;
+    
+    // Add the tilesets to the map
+    const bedroom1Tileset = this.map.addTilesetImage('bedroom1', 'bedroom1');
+    const floor1Tileset = this.map.addTilesetImage('floor1', 'floor1');
+    const wall1Tileset = this.map.addTilesetImage('wall1', 'wall1');
+    const livingroom2Tileset = this.map.addTilesetImage('livingroom2', 'livingroom2');
+    const exterior1Tileset = this.map.addTilesetImage('exterior1', 'exterior1');
+    const interior1Tileset = this.map.addTilesetImage('interior1', 'interior1');
+    const room1Tileset = this.map.addTilesetImage('room1', 'room1');
+    
+    // Create layers - adjust layer names based on mainland.json structure
+    this.groundLayer = this.map.createLayer('ground', [exterior1Tileset, interior1Tileset, room1Tileset]).setDepth(0);
+    this.roadLayer = this.map.createLayer('road', [exterior1Tileset, interior1Tileset, room1Tileset]).setDepth(1);
+    this.underObstaclesLayer = this.map.createLayer('underobstacle', [exterior1Tileset, interior1Tileset, room1Tileset]).setDepth(2);
+    this.bottomLayer = this.map.createLayer('botlayer', [exterior1Tileset, interior1Tileset, room1Tileset]).setDepth(3);
+    this.obstaclesLayer = this.map.createLayer('obstacle', [exterior1Tileset, interior1Tileset, room1Tileset]).setDepth(4);
+    this.topObstaclesLayer = this.map.createLayer('topobstacle', [exterior1Tileset, interior1Tileset, room1Tileset]).setDepth(5);
+    this.topLayer = this.map.createLayer('toplayer', [exterior1Tileset, interior1Tileset, room1Tileset]).setDepth(11);
+    this.signsLayer = this.map.createLayer('signs', [exterior1Tileset, interior1Tileset, room1Tileset]).setDepth(12);
+    
+    // Scale all layers by the map scale factor
+    this.groundLayer.setScale(this.mapScale);
+    this.roadLayer.setScale(this.mapScale);
+    this.underObstaclesLayer.setScale(this.mapScale);
+    this.bottomLayer.setScale(this.mapScale);
+    this.obstaclesLayer.setScale(this.mapScale);
+    this.topObstaclesLayer.setScale(this.mapScale);
+    this.topLayer.setScale(this.mapScale);
+    this.signsLayer.setScale(this.mapScale);
+    
+    // Set collision on layers
+    this.obstaclesLayer.setCollisionByProperty({ collide: true });
+    this.obstaclesLayer.setCollisionByExclusion([-1]);
+    
+    this.topObstaclesLayer.setCollisionByProperty({ collide: true });
+    this.topObstaclesLayer.setCollisionByExclusion([-1]);
+    
+    this.bottomLayer.setCollisionByProperty({ collide: true });
+    this.bottomLayer.setCollisionByExclusion([-1]);
+    
+    this.underObstaclesLayer.setCollisionByProperty({ collide: true });
+    this.underObstaclesLayer.setCollisionByExclusion([-1]);
+    
+    // Set physics world bounds
+    const mapWidth = this.map.widthInPixels * this.mapScale;
+    const mapHeight = this.map.heightInPixels * this.mapScale;
+    this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
   }
   
   createWorldDecorations() {
-    // Store additional houses for collision
-    this.additionalHouses = [];
-    
-    // Add a few more houses in different locations - removed scaling
-    let house2 = this.physics.add.sprite(800, 800, "house");
-    // Remove scale and adjust collision box directly
-    house2.setImmovable(true);
-    house2.body.allowGravity = false;
-    this.additionalHouses.push(house2);
-    
-    let house3 = this.physics.add.sprite(400, 1200, "house");
-    // Remove scale and adjust collision box directly
-    house3.setImmovable(true);
-    house3.body.allowGravity = false;
-    this.additionalHouses.push(house3);
-    
-    // Configure hitboxes with absolute sizes instead of relative to scale
-    this.additionalHouses.forEach(house => {
-      house.body.setSize(
-        house.width * 0.7, 
-        house.height * 0.4
-      );
-      house.body.setOffset(
-        house.width * 0.15,
-        house.height * 0.4
-      );
-    });
+    // Create house entrance at specific coordinates
+    this.createHouseEntrance();
     
     // Create beach entrance area
     this.createBeachEntrance();
+    
+    // Create mainland entrance area
+    this.createMainlandEntrance();
+  }
+  
+  createHouseEntrance() {
+    // Create a house entrance at specific coordinates
+    const houseEntrancePos = { x: 500, y: 379 };
+    this.houseEntrance = this.physics.add.sprite(houseEntrancePos.x, houseEntrancePos.y, 'player');
+    // Set size and appearance
+    this.houseEntrance.displayWidth = this.houseEntrance.width * 3;
+    this.houseEntrance.displayHeight = this.houseEntrance.height * 3;
+    this.houseEntrance.setTint(0xC05A53); // Reddish color for house
+    this.houseEntrance.setAlpha(0.7);
+    this.houseEntrance.setImmovable(true);
+    this.houseEntrance.body.allowGravity = false;
+    
+    // Add house sign
+    const houseSign = this.add.text(
+      houseEntrancePos.x, houseEntrancePos.y - 30, 
+      "→ HOUSE →", 
+      { font: "bold 16px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 3 }
+    );
+    houseSign.setOrigin(0.5, 0.5);
+    
+    // Add interaction with house entrance
+    this.physics.add.overlap(
+      this.player, 
+      this.houseEntrance, 
+      this.enterHouse, 
+      this.canEnterHouse, 
+      this
+    );
   }
   
   createBeachEntrance() {
@@ -538,82 +603,34 @@ class GameScene extends Phaser.Scene {
     );
   }
   
-  createHouse() {
-    // Create a physics-enabled house sprite
-    this.house = this.physics.add.sprite(250, 250, "house");
-    this.house.setOrigin(0.5, 0.5);
-    // Instead of scaling by 2, set width and height directly
-    this.house.displayWidth = this.house.width * 2;
-    this.house.displayHeight = this.house.height * 2;
-    this.house.setDepth(1);
-    this.house.setImmovable(true);
-    this.house.body.allowGravity = false;
+  createMainlandEntrance() {
+    // Create a mainland entrance area
+    const mainlandEntrancePos = { x: 1000, y: 200 };
+    this.mainlandEntrance = this.physics.add.sprite(mainlandEntrancePos.x, mainlandEntrancePos.y, 'player');
+    // Instead of scaling by 3, set width and height directly
+    this.mainlandEntrance.displayWidth = this.mainlandEntrance.width * 3;
+    this.mainlandEntrance.displayHeight = this.mainlandEntrance.height * 3;
+    this.mainlandEntrance.setTint(0x8ac541); // Green color
+    this.mainlandEntrance.setAlpha(0.7);
+    this.mainlandEntrance.setImmovable(true);
+    this.mainlandEntrance.body.allowGravity = false;
     
-    // Create a collision box adjusted for the new size
-    this.house.body.setSize(
-      this.house.width * 0.7, 
-      this.house.height * 0.4
+    // Add mainland sign
+    const mainlandSign = this.add.text(
+      mainlandEntrancePos.x, mainlandEntrancePos.y - 30, 
+      "→ MAINLAND →", 
+      { font: "bold 16px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 3 }
     );
-    this.house.body.setOffset(
-      this.house.width * 0.15,
-      this.house.height * 0.4
-    );
+    mainlandSign.setOrigin(0.5, 0.5);
     
-    // Add overlap (instead of collision) for house entry
+    // Add interaction with mainland entrance
     this.physics.add.overlap(
       this.player, 
-      this.house, 
-      this.enterHouse, 
-      this.canEnterHouse, 
+      this.mainlandEntrance, 
+      this.enterMainland, 
+      this.canEnterMainland, 
       this
     );
-  }
-
-  populateUI() {
-    // Create greeting and time labels
-    this.greetingLabel = this.add.text(10, 10, "", { font: "20px Arial", fill: "#ffffff" });
-    this.timeLabel = this.add.text(10, 40, "", { font: "18px Arial", fill: "#ffffff" });
-    this.moneyText = this.add.text(GAME_SIZE.width - 150, 10, `Money: $${this.money}`, { font: "20px Arial", fill: "#ffffff" });
-    
-    // Add labels to UI container
-    this.uiContainer.add([this.greetingLabel, this.timeLabel, this.moneyText]);
-    
-    // Update game time
-    this.updateGameTime();
-    
-    // Create progress bars and labels
-    this.createProgressBars();
-    
-    // Make sure UI displays current values
-    this.updateUI();
-  }
-  
-  createProgressBars() {
-    // Graphics for progress bars
-    this.progressBars = {
-      hunger: this.add.graphics(),
-      energy: this.add.graphics(),
-      hygiene: this.add.graphics(),
-      happiness: this.add.graphics(),
-    };
-    
-    // Set high depth for all progress bars
-    Object.values(this.progressBars).forEach(bar => {
-      bar.setDepth(100);
-    });
-    
-    // Labels
-    const hungerLabel = this.add.text(GAME_SIZE.width - 220, 48, "Hunger:", { font: "14px Arial", fill: "#ffffff" });
-    const energyLabel = this.add.text(GAME_SIZE.width - 220, 68, "Energy:", { font: "14px Arial", fill: "#ffffff" });
-    const hygieneLabel = this.add.text(GAME_SIZE.width - 220, 88, "Hygiene:", { font: "14px Arial", fill: "#ffffff" });
-    const happinessLabel = this.add.text(GAME_SIZE.width - 220, 108, "Happiness:", { font: "14px Arial", fill: "#ffffff" });
-    
-    // Add to UI container so they stay fixed to the camera
-    this.uiContainer.add([hungerLabel, energyLabel, hygieneLabel, happinessLabel]);
-    this.uiContainer.add(Object.values(this.progressBars));
-    
-    // Draw initial progress bars
-    this.drawProgressBars();
   }
   
   createPlayer() {
@@ -622,12 +639,22 @@ class GameScene extends Phaser.Scene {
     
     // Configure any additional scene-specific settings
     this.player.playerSpeed = PLAYER_SPEED;
+    
+    // Add collision with tilemap layers
+    this.physics.add.collider(this.player, this.obstaclesLayer);
+    this.physics.add.collider(this.player, this.topObstaclesLayer);
+    this.physics.add.collider(this.player, this.bottomLayer);
+    this.physics.add.collider(this.player, this.underObstaclesLayer);
   }
   
   setupCamera() {
     // Main camera - follows player
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.cameras.main.setBounds(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
+    
+    // Set camera bounds to map size
+    const mapWidth = this.map.widthInPixels * this.mapScale;
+    const mapHeight = this.map.heightInPixels * this.mapScale;
+    this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
     this.cameras.main.setZoom(1);
     
     // Add minimap camera in the corner
@@ -646,9 +673,10 @@ class GameScene extends Phaser.Scene {
       minimapX, minimapY, minimapWidth, minimapHeight
     );
     
-    // Configure minimap
-    this.minimapCamera.setBounds(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
-    this.minimapCamera.setZoom(0.1); // Zoom out to see more of the world
+    // Configure minimap - adjust zoom to account for the map scaling
+    const minimapZoom = 0.1 / this.mapScale; // Adjust zoom to compensate for map scaling
+    this.minimapCamera.setBounds(0, 0, this.map.widthInPixels * this.mapScale, this.map.heightInPixels * this.mapScale);
+    this.minimapCamera.setZoom(minimapZoom); // Zoom out more to see the scaled world
     this.minimapCamera.setBackgroundColor('rgba(0, 0, 0, 0.5)');
     this.minimapCamera.startFollow(this.player);
     
@@ -971,6 +999,65 @@ class GameScene extends Phaser.Scene {
     return !isLoadingBeach && !isTransitioning;
   }
 
+  // Update enterMainland method
+  enterMainland() {
+    if (isLoadingMainland || isTransitioning) return;
+    
+    // Store current player position before entering mainland
+    lastPlayerPos = { 
+      x: this.player.x, 
+      y: this.player.y
+    };
+    
+    // Update global stats before scene change
+    this.updateGlobalStats();
+    
+    // Set transition flags
+    isLoadingMainland = true;
+    isTransitioning = true;
+    
+    // Stop player movement
+    this.player.stopMovement();
+    
+    // Create a loading screen overlay
+    const loadingScreen = this.add.rectangle(
+      0, 0, 
+      GAME_SIZE.width, GAME_SIZE.height, 
+      0x000000, 0.8
+    );
+    loadingScreen.setOrigin(0, 0);
+    loadingScreen.setScrollFactor(0);
+    loadingScreen.setDepth(1000);
+    
+    const loadingText = this.add.text(
+      GAME_SIZE.width/2, GAME_SIZE.height/2, 
+      "Going to the mainland...", 
+      { font: "24px Arial", fill: "#ffffff" }
+    );
+    loadingText.setOrigin(0.5, 0.5);
+    loadingText.setScrollFactor(0);
+    loadingText.setDepth(1001);
+    
+    // Wait a moment before transitioning to mainland scene
+    this.time.delayedCall(1500, () => {
+      isLoadingMainland = false;
+      // Keep isTransitioning true until the mainland scene has fully loaded
+      this.scene.start("scene-mainland", {
+        isTransitioning: isTransitioning,
+        lastMainlandPos: lastMainlandPos,
+        playerName: playerName,
+        selectedCharacter: selectedCharacter,
+        PLAYER_SPEED: PLAYER_SPEED,
+        GAME_SIZE: GAME_SIZE
+      });
+    });
+  }
+
+  canEnterMainland() {
+    // Only allow entry if not already loading and not in transition
+    return !isLoadingMainland && !isTransitioning;
+  }
+
   // Add a helper method to update all UI elements
   updateUI() {
     // Update money text
@@ -982,6 +1069,53 @@ class GameScene extends Phaser.Scene {
     if (this.progressBars) {
       this.drawProgressBars();
     }
+  }
+
+  populateUI() {
+    // Create greeting and time labels
+    this.greetingLabel = this.add.text(10, 10, "", { font: "20px Arial", fill: "#ffffff" });
+    this.timeLabel = this.add.text(10, 40, "", { font: "18px Arial", fill: "#ffffff" });
+    this.moneyText = this.add.text(GAME_SIZE.width - 150, 10, `Money: $${this.money}`, { font: "20px Arial", fill: "#ffffff" });
+    
+    // Add labels to UI container
+    this.uiContainer.add([this.greetingLabel, this.timeLabel, this.moneyText]);
+    
+    // Update game time
+    this.updateGameTime();
+    
+    // Create progress bars and labels
+    this.createProgressBars();
+    
+    // Make sure UI displays current values
+    this.updateUI();
+  }
+  
+  createProgressBars() {
+    // Graphics for progress bars
+    this.progressBars = {
+      hunger: this.add.graphics(),
+      energy: this.add.graphics(),
+      hygiene: this.add.graphics(),
+      happiness: this.add.graphics(),
+    };
+    
+    // Set high depth for all progress bars
+    Object.values(this.progressBars).forEach(bar => {
+      bar.setDepth(100);
+    });
+    
+    // Labels
+    const hungerLabel = this.add.text(GAME_SIZE.width - 220, 48, "Hunger:", { font: "14px Arial", fill: "#ffffff" });
+    const energyLabel = this.add.text(GAME_SIZE.width - 220, 68, "Energy:", { font: "14px Arial", fill: "#ffffff" });
+    const hygieneLabel = this.add.text(GAME_SIZE.width - 220, 88, "Hygiene:", { font: "14px Arial", fill: "#ffffff" });
+    const happinessLabel = this.add.text(GAME_SIZE.width - 220, 108, "Happiness:", { font: "14px Arial", fill: "#ffffff" });
+    
+    // Add to UI container so they stay fixed to the camera
+    this.uiContainer.add([hungerLabel, energyLabel, hygieneLabel, happinessLabel]);
+    this.uiContainer.add(Object.values(this.progressBars));
+    
+    // Draw initial progress bars
+    this.drawProgressBars();
   }
 }
 
