@@ -75,6 +75,34 @@ class Player extends Phaser.Physics.Arcade.Sprite {
         repeat: -1
       });
     }
+    
+    // Add new animations for actions
+    if (!scene.anims.exists('sleep')) {
+      scene.anims.create({
+        key: 'sleep',
+        frames: scene.anims.generateFrameNumbers('player', { start: 16, end: 19 }),
+        frameRate: 5,
+        repeat: -1
+      });
+    }
+    
+    if (!scene.anims.exists('eat')) {
+      scene.anims.create({
+        key: 'eat',
+        frames: scene.anims.generateFrameNumbers('player', { start: 20, end: 23 }),
+        frameRate: 5,
+        repeat: -1
+      });
+    }
+    
+    if (!scene.anims.exists('bath')) {
+      scene.anims.create({
+        key: 'bath',
+        frames: scene.anims.generateFrameNumbers('player', { start: 28, end: 31 }),
+        frameRate: 5,
+        repeat: -1
+      });
+    }
   }
   
   update() {
@@ -132,6 +160,30 @@ class Player extends Phaser.Physics.Arcade.Sprite {
   stopMovement() {
     this.setVelocity(0);
     this.anims.stop();
+  }
+  
+  // Action animations functions
+  playSleepAnimation() {
+    this.stopMovement();
+    this.anims.play('sleep', true);
+    return this;
+  }
+  
+  playEatAnimation() {
+    this.stopMovement();
+    this.anims.play('eat', true);
+    return this;
+  }
+  
+  playBathAnimation() {
+    this.stopMovement();
+    this.anims.play('bath', true);
+    return this;
+  }
+  
+  stopActionAnimation() {
+    this.anims.stop();
+    return this;
   }
   
   // Static function to extract front-facing sprite for character selection

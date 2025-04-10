@@ -45,6 +45,7 @@ class HouseScene extends Phaser.Scene {
     this.happinessText = null;
     this.choreButton = null;
     this.choreText = null;
+    this.choreButtons = []; // Array to store multiple chore buttons
   }
 
   // ----------------------------------------
@@ -360,6 +361,17 @@ class HouseScene extends Phaser.Scene {
         energyCost: 15
       },
       {
+        name: 'Sleep',
+        x: 272,
+        y: 192,
+        width: 36*3,
+        height: 36*2,
+        reward: 0,
+        energyCost: 0,
+        energyGain: 50,
+        type: 'sleep'
+      },
+      {
         name: 'Dust Bookshelf',
         x: 490,
         y: 192,
@@ -417,45 +429,149 @@ class HouseScene extends Phaser.Scene {
   }
   
   updateChoreAreas() {
-    // Check if player is still in any chore area
-    let playerInChoreArea = false;
+    // Reset active chore areas
+    let activeChoreAreas = [];
+    
+    // Check if player is in any chore area
     this.choreAreas.forEach(area => {
       if (Phaser.Geom.Rectangle.Overlaps(
         this.player.getBounds(),
         area.getBounds()
       )) {
-        playerInChoreArea = true;
-        this.activeChoreArea = area;
+        activeChoreAreas.push(area);
       }
     });
     
-    // Hide chore button if player is not in a chore area
-    if (!playerInChoreArea) {
+    // Hide all chore buttons initially
+    this.hideAllChoreButtons();
+    
+    // If no active areas, clear active chore area
+    if (activeChoreAreas.length === 0) {
+      this.activeChoreArea = null;
+      return;
+    }
+    
+    // Group the chore areas by location
+    const locationGroups = {};
+    activeChoreAreas.forEach(area => {
+      const locationKey = `${area.x},${area.y}`;
+      if (!locationGroups[locationKey]) {
+        locationGroups[locationKey] = [];
+      }
+      locationGroups[locationKey].push(area);
+    });
+    
+    // Display buttons for each location group
+    Object.values(locationGroups).forEach(areas => {
+      this.displayChoreButtonsForLocation(areas);
+    });
+  }
+  
+  hideAllChoreButtons() {
+    // Hide the original chore button if it exists
+    if (this.choreButton) {
       this.choreButton.setVisible(false);
       this.choreText.setVisible(false);
-      this.activeChoreArea = null;
     }
+    
+    // Hide all buttons in the choreButtons array
+    this.choreButtons.forEach(buttonObj => {
+      buttonObj.button.setVisible(false);
+      buttonObj.text.setVisible(false);
+    });
+  }
+  
+  displayChoreButtonsForLocation(areas) {
+    // Sort areas by chore type - put regular chores first, then special types
+    areas.sort((a, b) => {
+      if (a.chore.type && !b.chore.type) return 1;
+      if (!a.chore.type && b.chore.type) return -1;
+      return 0;
+    });
+    
+    // Display buttons for each chore in this location
+    areas.forEach((area, index) => {
+      this.displayChoreButton(area, index, areas.length);
+    });
+  }
+  
+  displayChoreButton(area, index, totalButtons) {
+    const chore = area.chore;
+    const isCompleted = this.isChoreCompletedToday(chore.name);
+    
+    // Calculate vertical spacing
+    const yOffset = index * 60; // 60 pixels between buttons
+    
+    // Create button if it doesn't exist
+    if (this.choreButtons.length <= index) {
+      // Create new button
+      const button = this.add.rectangle(
+        this.gameSize.width / 2,
+        this.gameSize.height - 100 - yOffset,
+        200,
+        50,
+        isCompleted ? 0x888888 : (chore.type === 'sleep' ? 0x0066ff : 0x00aa00)
+      );
+      button.setScrollFactor(0);
+      button.setDepth(100);
+      button.setInteractive({ useHandCursor: true });
+      
+      // Store which chore this button belongs to
+      button.choreArea = area;
+      
+      // Add click event
+      button.on('pointerdown', () => {
+        this.activeChoreArea = button.choreArea;
+        this.doChore();
+      });
+      
+      // Create button text
+      const text = this.add.text(
+        this.gameSize.width / 2,
+        this.gameSize.height - 100 - yOffset,
+        this.getChoreButtonText(chore, isCompleted),
+        { font: '18px Arial', fill: '#ffffff', stroke: '#000000', strokeThickness: 2 }
+      );
+      text.setOrigin(0.5, 0.5);
+      text.setScrollFactor(0);
+      text.setDepth(101);
+      
+      // Store buttons
+      this.choreButtons.push({ button, text, choreArea: area });
+    } else {
+      // Update existing button
+      const buttonObj = this.choreButtons[index];
+      buttonObj.button.setPosition(this.gameSize.width / 2, this.gameSize.height - 100 - yOffset);
+      buttonObj.button.setFillStyle(isCompleted ? 0x888888 : (chore.type === 'sleep' ? 0x0066ff : 0x00aa00));
+      buttonObj.button.choreArea = area;
+      
+      buttonObj.text.setPosition(this.gameSize.width / 2, this.gameSize.height - 100 - yOffset);
+      buttonObj.text.setText(this.getChoreButtonText(chore, isCompleted));
+      buttonObj.choreArea = area;
+    }
+    
+    // Make button visible
+    this.choreButtons[index].button.setVisible(true);
+    this.choreButtons[index].text.setVisible(true);
+  }
+  
+  getChoreButtonText(chore, isCompleted) {
+    if (isCompleted) {
+      return `${chore.name} (Done for today)`;
+    }
+    
+    if (chore.type === 'sleep') {
+      return `${chore.name} (+${chore.energyGain} Energy)`;
+    }
+    
+    return `${chore.name} ($${chore.reward})`;
   }
   
   // Called when player enters a chore area
   enterChoreArea(player, area) {
-    // Set this as the active chore area
+    // This function is no longer needed as we're handling multiple buttons
+    // in the updateChoreAreas method, but we'll keep it for compatibility
     this.activeChoreArea = area;
-    
-    const choreId = area.chore.name;
-    const isCompleted = this.isChoreCompletedToday(choreId);
-    
-    // Update and show the chore button with appropriate text
-    if (isCompleted) {
-      this.choreText.setText(`${area.chore.name} (Done for today)`);
-      this.choreButton.setFillStyle(0x888888); // Gray out the button
-    } else {
-      this.choreText.setText(`${area.chore.name} ($${area.chore.reward})`);
-      this.choreButton.setFillStyle(0x00aa00); // Green button for available chores
-    }
-    
-    this.choreButton.setVisible(true);
-    this.choreText.setVisible(true);
   }
   
   // Check if a chore has been completed today
@@ -486,11 +602,51 @@ class HouseScene extends Phaser.Scene {
       return;
     }
     
-    // Check if player has enough energy
-    if (playerStats.energy < chore.energyCost) {
+    // Check if player has enough energy (except for sleep)
+    if (playerStats.energy < chore.energyCost && chore.type !== 'sleep') {
       this.showTemporaryMessage('Not enough energy!', '#ff0000');
       return;
     }
+    
+    // Handle special chore types
+    if (chore.type === 'sleep') {
+      // Mark the chore as completed today
+      this.completedChores[chore.name] = new Date().toISOString();
+      
+      // Play sleep animation
+      this.player.playSleepAnimation();
+      
+      // Show sleeping message
+      this.showTemporaryMessage('Sleeping...', '#00aaff');
+      
+      // Disable player input temporarily
+      this.player.stopMovement();
+      this.player.setActive(false);
+      
+      // After a delay, complete the sleep action
+      this.time.delayedCall(3000, () => {
+        // Increase energy and update global
+        const newEnergy = Math.min(100, playerStats.energy + chore.energyGain);
+        this.updatePlayerStat('energy', newEnergy);
+        
+        // Re-enable player
+        this.player.setActive(true);
+        this.player.stopActionAnimation();
+        
+        // Show success message
+        this.showTemporaryMessage(
+          `You feel refreshed!\nEnergy +${chore.energyGain}`, 
+          '#00ff00'
+        );
+        
+        // Update UI
+        this.updateStatsUI();
+      });
+      
+      return;
+    }
+    
+    // For regular chores:
     
     // Decrease energy and update global
     this.updatePlayerStat('energy', playerStats.energy - chore.energyCost);
@@ -558,7 +714,8 @@ class HouseScene extends Phaser.Scene {
   }
   
   createChoreButton() {
-    // Create chore button (initially hidden)
+    // Create chore button (initially hidden) - this is now a legacy method
+    // as we're using choreButtons array for multiple buttons
     this.choreButton = this.add.rectangle(
       this.gameSize.width / 2, 
       this.gameSize.height - 100,
@@ -584,6 +741,9 @@ class HouseScene extends Phaser.Scene {
     // Hide chore button initially
     this.choreButton.setVisible(false);
     this.choreText.setVisible(false);
+    
+    // Initialize empty array for multiple chore buttons
+    this.choreButtons = [];
   }
   
   displayWelcomeMessage() {

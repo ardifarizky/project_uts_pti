@@ -17,7 +17,7 @@ let isLoadingBeach = false; // New flag for beach transition
 let isLoadingMainland = false; // New flag for mainland transition
 let isTransitioning = false; // New flag to disable movement during transitions
 let game; // Define game variable outside so we can access it later
-let lastPlayerPos = { x: 100, y: 100 };
+let lastPlayerPos = { x: 1900, y: 2941 };
 let lastHousePos = { x: 300, y: 200 }; // Center of house, away from exit door
 let lastBeachPos = { x: 100, y: 100 }; // Default beach position
 let lastMainlandPos = { x: 250, y: 250 }; // Default mainland position
@@ -545,23 +545,36 @@ class GameScene extends Phaser.Scene {
   
   createHouseEntrance() {
     // Create a house entrance at specific coordinates
-    const houseEntrancePos = { x: 500, y: 379 };
+    const houseEntrancePos = { x: 1830, y: 2880 };
     this.houseEntrance = this.physics.add.sprite(houseEntrancePos.x, houseEntrancePos.y, 'player');
     // Set size and appearance
-    this.houseEntrance.displayWidth = this.houseEntrance.width * 3;
-    this.houseEntrance.displayHeight = this.houseEntrance.height * 3;
+    this.houseEntrance.displayWidth = this.houseEntrance.width * 2;
+    this.houseEntrance.displayHeight = this.houseEntrance.height * 2;
     this.houseEntrance.setTint(0xC05A53); // Reddish color for house
-    this.houseEntrance.setAlpha(0.7);
+    this.houseEntrance.setAlpha(0); // Make the entrance sprite invisible
     this.houseEntrance.setImmovable(true);
     this.houseEntrance.body.allowGravity = false;
+    this.houseEntrance.setDepth(6); // Set a higher depth to ensure collision works
     
-    // Add house sign
+    // Add a debug visual to show hitbox clearly but make it invisible
+    const debugRect = this.add.rectangle(
+      houseEntrancePos.x,
+      houseEntrancePos.y,
+      this.houseEntrance.displayWidth,
+      this.houseEntrance.displayHeight,
+      0xff0000,
+      0 // Set alpha to 0 to hide debug rectangle
+    );
+    debugRect.setDepth(5);
+    
+    // Add house sign (keep visible)
     const houseSign = this.add.text(
       houseEntrancePos.x, houseEntrancePos.y - 30, 
       "→ HOUSE →", 
       { font: "bold 16px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 3 }
     );
     houseSign.setOrigin(0.5, 0.5);
+    houseSign.setDepth(7); // Set above the entrance
     
     // Add interaction with house entrance
     this.physics.add.overlap(
