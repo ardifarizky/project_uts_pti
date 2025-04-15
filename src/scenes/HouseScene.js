@@ -350,6 +350,28 @@ class HouseScene extends Phaser.Scene {
         height: 36*2,
         reward: 10,
         energyCost: 5
+      },
+      {
+        name: 'Get some meal',
+        x: 401,
+        y: 192,
+        width: 36*2,
+        height: 36*2,
+        energyCost: 5,
+        hungerReward: 40,
+        description: 'Have a meal to restore hunger',
+        type: 'meal'
+      },
+      {
+        name: 'Take a bath',
+        x: 272,
+        y: 353,
+        width: 36*3,
+        height: 36*2,
+        energyCost: 10,
+        hygieneReward: 50,
+        description: 'Take a bath to restore hygiene',
+        type: 'bath'
       }
     ];
     
@@ -535,6 +557,14 @@ class HouseScene extends Phaser.Scene {
       return `${chore.name} (+${chore.energyGain} Energy)`;
     }
     
+    if (chore.hungerReward) {
+      return `${chore.name} (+${chore.hungerReward} Hunger)`;
+    }
+    
+    if (chore.hygieneReward) {
+      return `${chore.name} (+${chore.hygieneReward} Hygiene)`;
+    }
+    
     return `${chore.name} ($${chore.reward})`;
   }
   
@@ -612,6 +642,82 @@ class HouseScene extends Phaser.Scene {
       });
       
       return;
+    } else if (chore.type === 'meal') {
+      // Mark the chore as completed today
+      this.completedChores[chore.name] = new Date().toISOString();
+      
+      // Play eat animation
+      this.player.playEatAnimation();
+      
+      // Show eating message
+      this.showTemporaryMessage('Eating...', '#ffa500');
+      
+      // Disable player input temporarily
+      this.player.stopMovement();
+      this.player.setActive(false);
+      
+      // After a delay, complete the meal action
+      this.time.delayedCall(2000, () => {
+        // Decrease energy and update global
+        this.updatePlayerStat('energy', playerStats.energy - chore.energyCost);
+        
+        // Increase hunger and update global
+        const newHunger = Math.min(100, playerStats.hunger + chore.hungerReward);
+        this.updatePlayerStat('hunger', newHunger);
+        
+        // Re-enable player
+        this.player.setActive(true);
+        this.player.stopActionAnimation();
+        
+        // Show success message
+        this.showTemporaryMessage(
+          `Delicious meal!\nHunger +${chore.hungerReward}`,
+          '#00ff00'
+        );
+        
+        // Update the button appearance
+        this.updateChoreButtonAppearance(choreId);
+      });
+      
+      return;
+    } else if (chore.type === 'bath') {
+      // Mark the chore as completed today
+      this.completedChores[chore.name] = new Date().toISOString();
+      
+      // Play bath animation
+      this.player.playBathAnimation();
+      
+      // Show bathing message
+      this.showTemporaryMessage('Taking a bath...', '#00aaff');
+      
+      // Disable player input temporarily
+      this.player.stopMovement();
+      this.player.setActive(false);
+      
+      // After a delay, complete the bath action
+      this.time.delayedCall(2500, () => {
+        // Decrease energy and update global
+        this.updatePlayerStat('energy', playerStats.energy - chore.energyCost);
+        
+        // Increase hygiene and update global
+        const newHygiene = Math.min(100, playerStats.hygiene + chore.hygieneReward);
+        this.updatePlayerStat('hygiene', newHygiene);
+        
+        // Re-enable player
+        this.player.setActive(true);
+        this.player.stopActionAnimation();
+        
+        // Show success message
+        this.showTemporaryMessage(
+          `You feel clean!\nHygiene +${chore.hygieneReward}`,
+          '#00ff00'
+        );
+        
+        // Update the button appearance
+        this.updateChoreButtonAppearance(choreId);
+      });
+      
+      return;
     }
     
     // For regular chores:
@@ -619,21 +725,46 @@ class HouseScene extends Phaser.Scene {
     // Decrease energy and update global
     this.updatePlayerStat('energy', playerStats.energy - chore.energyCost);
     
-    // Increase money and update global
-    this.updatePlayerStat('money', playerStats.money + chore.reward);
+    // Handle hunger reward
+    if (chore.hungerReward) {
+      const newHunger = Math.min(100, playerStats.hunger + chore.hungerReward);
+      this.updatePlayerStat('hunger', newHunger);
+    }
+    
+    // Handle hygiene reward
+    if (chore.hygieneReward) {
+      const newHygiene = Math.min(100, playerStats.hygiene + chore.hygieneReward);
+      this.updatePlayerStat('hygiene', newHygiene);
+    }
+    
+    // Handle money reward (if any)
+    if (chore.reward) {
+      this.updatePlayerStat('money', playerStats.money + chore.reward);
+    }
     
     // Show success message
-    this.showTemporaryMessage(
-      `Completed ${chore.name}!\n+$${chore.reward}`, 
-      '#00ff00'
-    );
+    let successMessage = `Completed ${chore.name}!`;
+    if (chore.reward) successMessage += `\n+$${chore.reward}`;
+    if (chore.hungerReward) successMessage += `\n+${chore.hungerReward} Hunger`;
+    if (chore.hygieneReward) successMessage += `\n+${chore.hygieneReward} Hygiene`;
+    
+    this.showTemporaryMessage(successMessage, '#00ff00');
     
     // Mark the chore as completed today
     this.completedChores[chore.name] = new Date().toISOString();
     
     // Update the button appearance
-    this.choreText.setText(`${chore.name} (Done for today)`);
-    this.choreButton.setFillStyle(0x888888);
+    this.updateChoreButtonAppearance(choreId);
+  }
+  
+  updateChoreButtonAppearance(choreId) {
+    // Update all buttons in the choreButtons array that match this choreId
+    this.choreButtons.forEach(buttonObj => {
+      if (buttonObj.choreArea && buttonObj.choreArea.chore && buttonObj.choreArea.chore.name === choreId) {
+        buttonObj.text.setText(`${choreId} (Done for today)`);
+        buttonObj.button.setFillStyle(0x888888);
+      }
+    });
   }
   
   // ----------------------------------------

@@ -9,6 +9,7 @@ import PreloadScene from './preload.js';
 import MainLandScene from './scenes/MainLandScene.js';
 import MountainScene from './scenes/MountainScene.js';
 import TempleScene from './scenes/TempleScene.js';
+import LakeScene from './scenes/LakeScene.js';
 import StatsUI from './ui/StatsUI.js';
 
 // ===================== GLOBAL VARIABLES & SETUP =====================
@@ -20,6 +21,7 @@ let isLoadingBeach = false; // New flag for beach transition
 let isLoadingMainland = false; // New flag for mainland transition
 let isLoadingMountain = false; // New flag for mountain transition
 let isLoadingTemple = false; // New flag for temple transition
+let isLoadingLake = false; // New flag for lake transition
 let isTransitioning = false; // New flag to disable movement during transitions
 let game; // Define game variable outside so we can access it later
 let lastPlayerPos = { x: 1900, y: 2941 };
@@ -28,6 +30,7 @@ let lastBeachPos = { x: 100, y: 100 }; // Default beach position
 let lastMainlandPos = { x: 250, y: 250 }; // Default mainland position
 let lastMountainPos = { x: 250, y: 250 }; // Default mountain position
 let lastTemplePos = { x: 250, y: 250 }; // Default temple position
+let lastLakePos = { x: 500, y: 1600 }; // Default lake position
 let minimapVisible = true; // Add tracking variable for minimap visibility
 let isSettingsMenuOpen = false; // Track if settings menu is open
 let timeMultiplier = 1; // Time multiplier for developer tools
@@ -275,7 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
         tileBias: 32
       }
     },
-    scene: [PreloadScene, GameScene, HouseScene, Beach, TutorialScene, MainLandScene, MountainScene, TempleScene]
+    scene: [PreloadScene, GameScene, HouseScene, Beach, TutorialScene, MainLandScene, MountainScene, TempleScene, LakeScene]
   };
 
   // Initialize the game
@@ -647,6 +650,9 @@ class GameScene extends Phaser.Scene {
     // Create temple entrance
     this.createTempleEntrance();
     
+    // Create lake entrance
+    this.createLakeEntrance();
+    
     // Create travel bus station
     this.createTravelBus();
     
@@ -744,6 +750,59 @@ class GameScene extends Phaser.Scene {
       this.player, 
       this.templeEntrance, 
       this.enterTemple, 
+      () => !isTransitioning, // Only enter if not already transitioning
+      this
+    );
+  }
+  
+  createLakeEntrance() {
+    // Create a lake entrance at specific coordinates
+    const lakeEntrancePos = { x: 1677, y: 133 };
+    this.lakeEntrance = this.physics.add.sprite(lakeEntrancePos.x, lakeEntrancePos.y, 'player');
+    // Set size and appearance
+    this.lakeEntrance.displayWidth = this.lakeEntrance.width * 2;
+    this.lakeEntrance.displayHeight = this.lakeEntrance.height * 2;
+    this.lakeEntrance.setTint(0x4169E1); // Royal blue color for lake
+    this.lakeEntrance.setAlpha(0); // Make the entrance sprite invisible
+    this.lakeEntrance.setImmovable(true);
+    this.lakeEntrance.body.allowGravity = false;
+    this.lakeEntrance.setDepth(6); // Set a higher depth to ensure collision works
+    
+    // Add a debug visual to show hitbox clearly but make it invisible
+    const debugRect = this.add.rectangle(
+      lakeEntrancePos.x,
+      lakeEntrancePos.y,
+      this.lakeEntrance.displayWidth,
+      this.lakeEntrance.displayHeight,
+      0xff0000,
+      0 // Set alpha to 0 to hide debug rectangle
+    );
+    debugRect.setDepth(5);
+    
+    // Add lake sign with floating animation
+    const lakeSign = this.add.text(
+      lakeEntrancePos.x, lakeEntrancePos.y - 30, 
+      "LAKE", 
+      { font: "bold 16px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 3 }
+    );
+    lakeSign.setOrigin(0.5, 0.5);
+    lakeSign.setDepth(7); // Set above the entrance
+    
+    // Add floating animation to the lake sign
+    this.tweens.add({
+      targets: lakeSign,
+      y: lakeEntrancePos.y - 40, // Float up by 10 pixels
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    
+    // Add interaction with lake entrance
+    this.physics.add.overlap(
+      this.player, 
+      this.lakeEntrance, 
+      this.enterLake, 
       () => !isTransitioning, // Only enter if not already transitioning
       this
     );
@@ -1342,6 +1401,44 @@ class GameScene extends Phaser.Scene {
         });
       } catch (error) {
         console.error("Error starting temple scene:", error);
+        isTransitioning = false;
+      }
+    });
+  }
+  
+  enterLake() {
+    // Check if already transitioning
+    if (isTransitioning) {
+      return;
+    }
+    
+    // Save last player position for when they return from the lake
+    if (typeof window !== 'undefined') {
+      window.lastLakePos = { x: 250, y: 250 };
+    }
+    
+    // Transition to lake scene
+    isTransitioning = true;
+    
+    // Use a safety timer to handle transition issues
+    addSafetyResetTimer();
+    
+    // Show transition screen
+    this.createTransitionMessage("Heading to the lake...");
+    
+    // Transition to lake scene after a delay
+    this.time.delayedCall(1000, () => {
+      try {
+        this.scene.start('scene-lake', {
+          playerName: this.playerName,
+          selectedCharacter: this.selectedCharacter,
+          PLAYER_SPEED: this.PLAYER_SPEED,
+          GAME_SIZE: this.GAME_SIZE,
+          lastLakePos: window.lastLakePos || { x: 250, y: 250 },
+          isTransitioning: false
+        });
+      } catch (error) {
+        console.error("Error starting lake scene:", error);
         isTransitioning = false;
       }
     });

@@ -81,6 +81,7 @@ class MountainScene extends Phaser.Scene {
     this.createPlayer();
     this.createExitDoor();
     this.createChoreAreas();
+    this.createTravelBus(); // Add travel bus
     this.createStatsUI(); // Create global stats UI
     
     // Setup camera
@@ -473,6 +474,243 @@ class MountainScene extends Phaser.Scene {
         console.error("Error creating activity button:", error);
       }
     }
+  }
+
+  // ----------------------------------------
+  // TRAVEL BUS METHODS
+  // ----------------------------------------
+  
+  createTravelBus() {
+    // Create a travel bus at specific coordinates (adjust positions as needed)
+    const busPosX = 710;
+    const busPosY = 300;
+    
+    // Create the hitbox
+    this.travelBus = this.physics.add.sprite(busPosX, busPosY, 'player');
+    this.travelBus.displayWidth = this.travelBus.width * 3;
+    this.travelBus.displayHeight = this.travelBus.height * 3;
+    this.travelBus.setTint(0x4682B4); // Steel blue color
+    this.travelBus.setAlpha(0.7);
+    this.travelBus.setImmovable(true);
+    this.travelBus.body.allowGravity = false;
+    
+    // Add travel bus sign
+    const busSign = this.add.text(
+      busPosX, busPosY - 50, 
+      "TRAVEL BUS", 
+      { font: "bold 20px Arial", fill: "#ffffff", stroke: "#000000", strokeThickness: 3 }
+    );
+    busSign.setOrigin(0.5, 0.5);
+    busSign.setDepth(100);
+    
+    // Add floating animation to the bus sign
+    this.tweens.add({
+      targets: busSign,
+      y: busPosY - 60, // Float up by 10 pixels
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    
+    // Add interaction with travel bus
+    this.physics.add.overlap(
+      this.player, 
+      this.travelBus, 
+      this.showTravelOptions, 
+      () => !this.isTransitioning, // Only show travel options if not already transitioning
+      this
+    );
+  }
+  
+  showTravelOptions() {
+    // Skip if already showing travel options or in transition
+    if (this.travelMenu || this.isTransitioning) return;
+    
+    // Create a semi-transparent background
+    const menuBg = this.add.rectangle(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2,
+      400,
+      300,
+      0x000000,
+      0.8
+    );
+    menuBg.setScrollFactor(0);
+    menuBg.setDepth(1000);
+    
+    // Create title text
+    const titleText = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 - 100,
+      "Select Destination",
+      { font: "bold 24px Arial", fill: "#ffffff" }
+    );
+    titleText.setOrigin(0.5, 0.5);
+    titleText.setScrollFactor(0);
+    titleText.setDepth(1001);
+    
+    // Create beach button
+    const beachButton = this.add.rectangle(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 - 30,
+      300,
+      50,
+      0x87CEEB // Sky blue color for beach
+    );
+    beachButton.setScrollFactor(0);
+    beachButton.setDepth(1001);
+    beachButton.setInteractive({ useHandCursor: true });
+    
+    const beachText = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 - 30,
+      "Beach",
+      { font: "20px Arial", fill: "#ffffff" }
+    );
+    beachText.setOrigin(0.5, 0.5);
+    beachText.setScrollFactor(0);
+    beachText.setDepth(1002);
+    
+    // Create home button (new option)
+    const homeButton = this.add.rectangle(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 + 40,
+      300,
+      50,
+      0x2E8B57 // Green color for home
+    );
+    homeButton.setScrollFactor(0);
+    homeButton.setDepth(1001);
+    homeButton.setInteractive({ useHandCursor: true });
+    
+    const homeText = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 + 40,
+      "Back to Home (Spawn)",
+      { font: "20px Arial", fill: "#ffffff" }
+    );
+    homeText.setOrigin(0.5, 0.5);
+    homeText.setScrollFactor(0);
+    homeText.setDepth(1002);
+    
+    // Create cancel button
+    const cancelButton = this.add.rectangle(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 + 110,
+      300,
+      50,
+      0xff6347 // Tomato red
+    );
+    cancelButton.setScrollFactor(0);
+    cancelButton.setDepth(1001);
+    cancelButton.setInteractive({ useHandCursor: true });
+    
+    const cancelText = this.add.text(
+      this.cameras.main.width / 2,
+      this.cameras.main.height / 2 + 110,
+      "Cancel",
+      { font: "20px Arial", fill: "#ffffff" }
+    );
+    cancelText.setOrigin(0.5, 0.5);
+    cancelText.setScrollFactor(0);
+    cancelText.setDepth(1002);
+    
+    // Store all UI elements in a container
+    this.travelMenu = this.add.container(0, 0, [
+      menuBg, titleText, 
+      beachButton, beachText,
+      homeButton, homeText,
+      cancelButton, cancelText
+    ]);
+    this.travelMenu.setDepth(1000);
+    
+    // Add click handlers
+    beachButton.on('pointerdown', () => {
+      this.closeTravelMenu();
+      this.enterBeach();
+    });
+    
+    homeButton.on('pointerdown', () => {
+      this.closeTravelMenu();
+      this.teleportToSpawn();
+    });
+    
+    cancelButton.on('pointerdown', () => {
+      this.closeTravelMenu();
+    });
+  }
+  
+  closeTravelMenu() {
+    if (this.travelMenu) {
+      this.travelMenu.destroy();
+      this.travelMenu = null;
+    }
+  }
+  
+  enterBeach() {
+    // Check if already transitioning
+    if (this.isTransitioning) {
+      return;
+    }
+    
+    // Save last player position for when they return from the beach
+    if (typeof window !== 'undefined') {
+      window.lastBeachPos = { x: 592, y: 120 }; // Position near the beach bus
+    }
+    
+    // Transition to beach scene
+    this.isTransitioning = true;
+    
+    // Show transition screen
+    this.createTransitionScreen("Traveling to the beach...");
+    
+    // Transition to beach scene after a delay
+    this.time.delayedCall(1000, () => {
+      try {
+        this.scene.start('scene-beach', {
+          playerName: this.playerName,
+          selectedCharacter: this.selectedCharacter,
+          PLAYER_SPEED: this.playerSpeed,
+          lastBeachPos: window.lastBeachPos || { x: 592, y: 120 },
+          isTransitioning: false
+        });
+      } catch (error) {
+        console.error("Error transitioning to beach scene:", error);
+        // Try to recover by switching to spawn
+        this.teleportToSpawn();
+      }
+    });
+  }
+  
+  teleportToSpawn() {
+    // Check if already transitioning
+    if (this.isTransitioning) {
+      return;
+    }
+    
+    // Transition to home/spawn
+    this.isTransitioning = true;
+    
+    // Show transition screen
+    this.createTransitionScreen("Returning home...");
+    
+    // Transition to main scene after a delay
+    this.time.delayedCall(1000, () => {
+      try {
+        this.scene.start('scene-game', {
+          playerName: this.playerName,
+          selectedCharacter: this.selectedCharacter,
+          PLAYER_SPEED: this.playerSpeed,
+          GAME_SIZE: this.gameSize,
+          isTransitioning: false
+        });
+      } catch (error) {
+        console.error("Error transitioning to main scene:", error);
+        // If we can't transition, just reset transition flag
+        this.isTransitioning = false;
+      }
+    });
   }
 
   // ----------------------------------------

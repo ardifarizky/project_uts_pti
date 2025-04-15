@@ -20,9 +20,11 @@ class TempleScene extends Phaser.Scene {
     
     // Map layers
     this.map = null;
-    this.groundLayer = null;
+    this.floorLayer = null;
+    this.carpetLayer = null;
     this.wallLayer = null;
-    this.obstacleLayer = null;
+    this.ceilingLayer = null;
+    this.lightLayer = null;
     
     // Game objects
     this.player = null;
@@ -39,6 +41,7 @@ class TempleScene extends Phaser.Scene {
     
     // UI elements
     this.statsUI = null; // Using global StatsUI instead
+    this.exitButton = null; // Add exit button reference
   }
 
   // ----------------------------------------
@@ -66,7 +69,7 @@ class TempleScene extends Phaser.Scene {
   
   preload() {
     // Load tilemap data
-    this.load.tilemapTiledJSON('temple-map', '/assets/tilemap/mushola.tmj');
+    this.load.tilemapTiledJSON('temple-map', '/assets/tilemap/mushola.json');
     
     // Load tileset images
     this.load.image('interior1', '/assets/tiles/interior1.png');
@@ -83,6 +86,7 @@ class TempleScene extends Phaser.Scene {
     this.createExitDoor();
     this.createChoreAreas();
     this.createStatsUI(); // Create global stats UI
+    this.createExitButton(); // Add exit button
     
     // Setup camera
     this.setupCamera();
@@ -163,26 +167,30 @@ class TempleScene extends Phaser.Scene {
     const interior1Tileset = this.map.addTilesetImage('interior1', 'interior1');
     const room1Tileset = this.map.addTilesetImage('room1', 'room1');
     
-    // Create layers
-    this.groundLayer = this.map.createLayer('ground', [interior1Tileset, room1Tileset]).setDepth(0);
-    this.wallLayer = this.map.createLayer('wall', [interior1Tileset, room1Tileset]).setDepth(1);
-    this.obstacleLayer = this.map.createLayer('obstacle', [interior1Tileset, room1Tileset]).setDepth(3);
+    // Create layers with correct names and depths (bottom to top)
+    this.floorLayer = this.map.createLayer('floor', [interior1Tileset, room1Tileset]).setDepth(0);
+    this.carpetLayer = this.map.createLayer('carpet', [interior1Tileset, room1Tileset]).setDepth(1);
+    this.lightLayer = this.map.createLayer('light', [interior1Tileset, room1Tileset]).setDepth(2);
+    this.wallLayer = this.map.createLayer('wall', [interior1Tileset, room1Tileset]).setDepth(3);
+    this.ceilingLayer = this.map.createLayer('ceiling', [interior1Tileset, room1Tileset]).setDepth(4);
     
-    // Scale the layers by map scale factor
-    this.groundLayer.setScale(this.mapScale);
+    // Scale all layers by map scale factor
+    this.floorLayer.setScale(this.mapScale);
+    this.carpetLayer.setScale(this.mapScale);
     this.wallLayer.setScale(this.mapScale);
-    this.obstacleLayer.setScale(this.mapScale);
+    this.ceilingLayer.setScale(this.mapScale);
+    this.lightLayer.setScale(this.mapScale);
     
     // Set collision on layers
     this.wallLayer.setCollisionByProperty({ collide: true });
-    this.obstacleLayer.setCollisionByProperty({ collide: true });
-    this.obstacleLayer.setCollisionByExclusion([-1]);
     this.wallLayer.setCollisionByExclusion([-1]);
     
     // Set layers to their default positions (0,0)
-    this.groundLayer.setPosition(0, 0);
+    this.floorLayer.setPosition(0, 0);
+    this.carpetLayer.setPosition(0, 0);
     this.wallLayer.setPosition(0, 0);
-    this.obstacleLayer.setPosition(0, 0);
+    this.ceilingLayer.setPosition(0, 0);
+    this.lightLayer.setPosition(0, 0);
     
     // Set physics world bounds to match the map size
     const mapWidth = this.map.widthInPixels * this.mapScale;
@@ -229,7 +237,6 @@ class TempleScene extends Phaser.Scene {
     
     // Add collision with tilemap layers
     this.physics.add.collider(this.player, this.wallLayer);
-    this.physics.add.collider(this.player, this.obstacleLayer);
   }
   
   // ----------------------------------------
@@ -517,6 +524,85 @@ class TempleScene extends Phaser.Scene {
     });
   }
 
+  // Create exit button to return to spawn
+  createExitButton() {
+    // Create a button in the corner of the screen
+    const buttonX = this.cameras.main.width - 80;
+    const buttonY = this.cameras.main.height - 40;
+    
+    // Create the button background
+    const buttonBg = this.add.rectangle(buttonX, buttonY, 120, 40, 0xFFD700, 0.8);
+    buttonBg.setScrollFactor(0);
+    buttonBg.setDepth(1000);
+    buttonBg.setStrokeStyle(2, 0xFFFFFF);
+    
+    // Create button text
+    const buttonText = this.add.text(buttonX, buttonY, "EXIT TEMPLE", {
+      font: "16px Arial",
+      fill: "#000000"
+    });
+    buttonText.setOrigin(0.5);
+    buttonText.setScrollFactor(0);
+    buttonText.setDepth(1001);
+    
+    // Make the button interactive
+    buttonBg.setInteractive({ useHandCursor: true });
+    buttonBg.on('pointerover', () => {
+      buttonBg.setFillStyle(0xDAA520, 0.9); // Darken on hover
+    });
+    buttonBg.on('pointerout', () => {
+      buttonBg.setFillStyle(0xFFD700, 0.8); // Restore on mouse out
+    });
+    buttonBg.on('pointerdown', () => {
+      this.teleportToSpawn();
+    });
+    
+    // Save references to button elements
+    this.exitButton = {
+      bg: buttonBg,
+      text: buttonText
+    };
+  }
+
+  // Teleport back to main spawn
+  teleportToSpawn() {
+    // Check if already transitioning
+    if (this.isTransitioning) {
+      return;
+    }
+    
+    // Transition to home/spawn
+    this.isTransitioning = true;
+    
+    // Show transition screen
+    this.createTransitionScreen("Returning to town...");
+    
+    // Save player position for when they return
+    if (typeof window !== 'undefined') {
+      window.lastTemplePos = {
+        x: this.player.x / this.mapScale,
+        y: this.player.y / this.mapScale
+      };
+    }
+    
+    // Transition to main scene after a delay
+    this.time.delayedCall(1000, () => {
+      try {
+        this.scene.start('scene-game', {
+          playerName: this.playerName,
+          selectedCharacter: this.selectedCharacter,
+          PLAYER_SPEED: this.playerSpeed,
+          GAME_SIZE: this.gameSize,
+          isTransitioning: false
+        });
+      } catch (error) {
+        console.error("Error transitioning to main scene:", error);
+        // If we can't transition, just reset transition flag
+        this.isTransitioning = false;
+      }
+    });
+  }
+
   // ----------------------------------------
   // CLEANUP METHODS
   // ----------------------------------------
@@ -535,6 +621,12 @@ class TempleScene extends Phaser.Scene {
     // Hide UI elements
     if (this.statsUI) {
       this.statsUI.hide();
+    }
+    
+    // Hide exit button
+    if (this.exitButton) {
+      this.exitButton.bg.setVisible(false);
+      this.exitButton.text.setVisible(false);
     }
     
     // Reset flags
@@ -557,6 +649,13 @@ class TempleScene extends Phaser.Scene {
         this.statsUI.destroy();
       }
       this.statsUI = null;
+    }
+    
+    // Destroy exit button
+    if (this.exitButton) {
+      this.exitButton.bg.destroy();
+      this.exitButton.text.destroy();
+      this.exitButton = null;
     }
     
     // Clear arrays
